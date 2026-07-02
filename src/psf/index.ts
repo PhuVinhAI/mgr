@@ -14,7 +14,7 @@
  */
 
 /** Bumped when the PSF envelope changes shape. */
-export const PSF_SPEC_VERSION = "1.0";
+export const PSF_SPEC_VERSION = "1.1";
 
 export interface PsfSectionDef {
   /** Internal id — the string a user writes after `@section`. */

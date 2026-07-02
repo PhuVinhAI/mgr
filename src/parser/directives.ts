@@ -58,8 +58,14 @@ export interface DirectiveDefinition {
  * future PRDs; user code MUST NOT define them. The parser raises
  * DIRECTIVE_RESERVED when it encounters one that no Foundation
  * handler owns yet.
+ *
+ * The second block reserves names claimed by PRD-005 §7/§7a, PRD-006
+ * §5a/§11a, PRD-009, and PRD-010. Reserving them now keeps user files
+ * from squatting on directives whose syntax lands in later Foundation
+ * releases.
  */
 export const RESERVED_DIRECTIVES: ReadonlySet<string> = new Set([
+  // PRD-002 §11 originals
   "include",
   "define",
   "const",
@@ -79,6 +85,28 @@ export const RESERVED_DIRECTIVES: ReadonlySet<string> = new Set([
   "insert-after",
   "toc",
   "export",
+  // PRD-006 §11a Visibility, §5a Transient Entity
+  "visibility",
+  "public",
+  "private",
+  "hidden",
+  "transient",
+  "entity",
+  "variable",
+  "collection",
+  "property",
+  // PRD-005 §7 / §7a Pre-Event / Post-Event
+  "pre-event",
+  "post-event",
+  // PRD-009 Formula System
+  "formula",
+  // PRD-010 Rule Language
+  "rule",
+  "precondition",
+  "effect",
+  "trigger",
+  "guard",
+  "priority",
 ]);
 
 export class DirectiveRegistry {

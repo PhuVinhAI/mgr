@@ -104,6 +104,38 @@ describe("directive registry (PRD-002 §14)", () => {
       expect(RESERVED_DIRECTIVES.has(name)).toBe(true);
     }
   });
+
+  it("reserves directive names claimed by PRD-005/006/009/010", () => {
+    // Reserving these now prevents user files from squatting on
+    // syntax that lands in future Foundation releases.
+    for (const name of [
+      // PRD-006 §11a Visibility
+      "visibility",
+      "public",
+      "private",
+      "hidden",
+      // PRD-006 §5a Transient Entity
+      "transient",
+      "entity",
+      "variable",
+      "collection",
+      "property",
+      // PRD-005 §7/§7a Pre/Post Event
+      "pre-event",
+      "post-event",
+      // PRD-009 Formula System
+      "formula",
+      // PRD-010 Rule Language
+      "rule",
+      "precondition",
+      "effect",
+      "trigger",
+      "guard",
+      "priority",
+    ]) {
+      expect(RESERVED_DIRECTIVES.has(name)).toBe(true);
+    }
+  });
 });
 
 describe("parser rejects reserved directives (PRD-002 §11)", () => {
@@ -133,6 +165,22 @@ describe("parser rejects reserved directives (PRD-002 §11)", () => {
     } catch (err) {
       expect(err).toBeInstanceOf(MgrError);
       expect((err as MgrError).code).toBe("UNKNOWN_DIRECTIVE");
+    }
+  });
+
+  it("emits DIRECTIVE_RESERVED for names claimed by PRD-009/010", () => {
+    for (const name of ["formula", "rule", "visibility", "transient"]) {
+      try {
+        parseSource({
+          file: "/x/main.md",
+          relPath: "main.md",
+          source: `@${name} foo\n`,
+        });
+        throw new Error(`expected parseSource to throw on @${name}`);
+      } catch (err) {
+        expect(err).toBeInstanceOf(MgrError);
+        expect((err as MgrError).code).toBe("DIRECTIVE_RESERVED");
+      }
     }
   });
 });

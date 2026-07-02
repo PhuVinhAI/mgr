@@ -19,7 +19,7 @@
  */
 
 /** Bumped when a Runtime Layer body changes shape or wording. */
-export const RUNTIME_SPEC_VERSION = "1.3";
+export const RUNTIME_SPEC_VERSION = "1.4";
 
 export interface RuntimeSectionDef {
   /** Canonical section id (matches PSF §11). */
@@ -63,19 +63,20 @@ Do not reorder steps.
 2. READ CURRENT STATE
 3. READ PLAYER INPUT
 4. VALIDATE INPUT
-5. RESOLVE ACTION
-6. UPDATE STATE
-7. PROCESS EVENTS
-8. CHECK END CONDITIONS
-9. GENERATE RESPONSE
-10. WAIT NEXT TURN
+5. PRE EVENTS
+6. RESOLVE ACTION
+7. POST EVENTS
+8. UPDATE STATE
+9. CHECK END CONDITIONS
+10. GENERATE RESPONSE
+11. WAIT NEXT TURN
 
 Every step must complete before the next begins. No action reaches
 the state without passing through the loop.
 
 A turn is a transaction. It has a beginning, an end, a fixed order,
-and it is never left half-done. The transaction is organized into six
-phases:
+and it is never left half-done. The transaction is organized into
+seven phases:
 
 1. Input Phase — receive one input (from Player, System, or an
    internal Event) and normalize it into an action object.
@@ -83,17 +84,24 @@ phases:
    hold, resources are sufficient, the rules permit it, and the state
    is well-formed. On failure, end the lifecycle now; the state does
    not change.
-3. Simulation Phase — compute the action's result. Do not write state
-   yet. Only produce the intended changes.
-4. Event Phase — after simulation, drain the event queue in order:
-   random events, story events, scheduled events, NPC events,
-   environment events. Events may enqueue further events, but the
-   runtime must process the queue sequentially with a bounded depth —
-   never recurse without limit, never run events in parallel.
-5. State Commit — after every simulation and event has resolved,
+3. Pre Event Phase — drain the pre-event queue before Simulation.
+   Pre events prepare the turn's environment: weather rolls, hidden
+   variables, scheduled events that must resolve before the player's
+   action. Pre events may write to hidden state; they never commit.
+4. Simulation Phase — compute the action's result using the
+   environment produced by Pre Events. Do not write state yet. Only
+   produce the intended changes.
+5. Post Event Phase — after simulation, drain the post-event queue in
+   order: random events, story events, NPC events, consequence
+   events. Post events react to what the Simulation produced. Events
+   may enqueue further events, but the runtime must process each
+   queue sequentially with a bounded depth — never recurse without
+   limit, never run events in parallel, never move a pre-event onto
+   the post-event queue or the reverse.
+6. State Commit — after every simulation and event has resolved,
    write the state once, atomically. If anything failed before this
    point, discard every proposed change.
-6. Response Phase — after the commit, generate the response
+7. Response Phase — after the commit, generate the response
    (narrative, effect summary, updated UI, available actions). The
    response never edits state.
 
@@ -103,12 +111,15 @@ rule conflicts at random.
 
 Lifecycle invariants that hold on every turn:
 - Input is read exactly once.
-- Validation runs before Simulation.
-- Simulation runs before Commit.
+- Validation runs before Pre Event.
+- Pre Event runs before Simulation.
+- Simulation runs before Post Event.
+- Post Event runs before Commit.
 - Commit runs before Response.
 - Response does not modify state.
 - State commits at most once per turn.
 - No event runs after Commit.
+- Pre and Post event queues are distinct.
 
 When the response is complete, enter WAIT PLAYER INPUT and do nothing
 further until the next turn begins.`;
@@ -360,16 +371,29 @@ Building blocks.
   (player → guild → members; company → employees). Relationships are
   part of state.
 
-Public and hidden state.
-State has two layers. Public state is visible to the player through
-the UI. Hidden state is used only by the runtime — AI strategy,
-future events, secret values, unexplored map. The player never sees
-hidden state directly.
+Persistent and transient entities.
+Entities come in two kinds:
+- Persistent — live in the snapshot, survive across turns. Default.
+- Transient — live only inside one Turn or one Phase. Never enter
+  the snapshot, never appear in turn history. A game declares
+  transient entities with a Kind and a Lifetime, for example
+  "Kind: Transient, Lifetime: Simulation Phase". The runtime creates
+  them when a rule requires and discards them when the lifetime ends.
 
-Property visibility. Every property has one of three levels:
-- Public — always visible to the player.
+Public, private, and hidden state.
+State has three visibility levels, declared per variable, property,
+or collection:
+- Public — always visible to the player. Rendered in the dashboard
+  and in the state snapshot.
 - Private — used by the runtime, disclosed only when a rule allows.
-- Hidden — never revealed directly.
+  Not rendered by default.
+- Hidden — never revealed directly. Used for AI strategy, future
+  events, secret values, unexplored map. Rendered as \`???\` or
+  \`Unknown\` when a rule forces the runtime to acknowledge it.
+
+The game package declares visibility. The runtime does not guess.
+If a value is not labeled, treat it as Public and emit a warning in
+turn history.
 
 Mutation.
 State only changes at the State Commit step of the turn lifecycle.

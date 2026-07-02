@@ -76,7 +76,8 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
 
     // The canonical turn-loop body encodes PRD-004 §4 literally.
     expect(result.output).toContain("1. LOAD SPECIFICATION");
-    expect(result.output).toContain("10. WAIT NEXT TURN");
+    // 11 steps after PRD-005 §7/§7a split Event into Pre and Post.
+    expect(result.output).toContain("11. WAIT NEXT TURN");
 
     // Authority order from §7 is present in the state-machine body.
     expect(result.output).toContain("1. System Layer");
@@ -182,8 +183,9 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
     expect(result.output).toContain(
       `- Runtime Spec Version: ${RUNTIME_SPEC_VERSION}`,
     );
-    // Version tracks the shape of the bodies. PRD-007 bumped it to 1.3.
-    expect(RUNTIME_SPEC_VERSION).toBe("1.3");
+    // Version tracks the shape of the bodies. PRD-005 §7/§7a and
+    // PRD-006 §5a/§11a bumped it to 1.4.
+    expect(RUNTIME_SPEC_VERSION).toBe("1.4");
   });
 
   it("stays deterministic across two builds with the same source", async () => {
@@ -211,7 +213,7 @@ describe("turn lifecycle content (PRD-005)", () => {
     if (root) await rm(root, { recursive: true, force: true });
   });
 
-  it("turn-loop body carries the six-phase transaction model", async () => {
+  it("turn-loop body carries the seven-phase transaction model", async () => {
     root = await makeProject({
       "mgr.config.json": JSON.stringify({ name: "tl", entry: "main.md" }),
       "src/main.md": "@section system\n\nS\n",
@@ -219,12 +221,14 @@ describe("turn lifecycle content (PRD-005)", () => {
     const result = await compile({ root, buildDate: new Date(0) });
     const tl = runtimeSectionBody("turn-loop") ?? "";
 
-    // §3 architecture — every phase must be named.
+    // §3 architecture — every phase must be named, including the
+    // Pre/Post Event split added in v1.1.
     for (const phase of [
       "Input Phase",
       "Validation Phase",
+      "Pre Event Phase",
       "Simulation Phase",
-      "Event Phase",
+      "Post Event Phase",
       "State Commit",
       "Response Phase",
     ]) {
@@ -242,10 +246,13 @@ describe("turn lifecycle content (PRD-005)", () => {
     expect(tl.toLowerCase()).toContain("parallel");
 
     // §20 invariants — Response never modifies state; commit happens
-    // at most once; no event after commit.
+    // at most once; no event after commit; Pre/Post queues distinct.
     expect(tl).toContain("Response does not modify state.");
     expect(tl).toContain("State commits at most once per turn.");
     expect(tl).toContain("No event runs after Commit.");
+    expect(tl).toContain("Pre Event runs before Simulation.");
+    expect(tl).toContain("Post Event runs before Commit.");
+    expect(tl).toContain("Pre and Post event queues are distinct.");
   });
 
   it("state-machine body encodes atomicity, idempotency, side effects", async () => {
@@ -315,14 +322,19 @@ describe("state system content (PRD-006)", () => {
       expect(sc).toContain(`- ${kind}.`);
     }
 
-    // §11 public/hidden layers.
-    expect(sc).toContain("Public and hidden state.");
-    expect(sc).toContain("hidden state directly");
+    // §11 + §11a (v1.1) — three-level visibility with declaration.
+    expect(sc).toContain("Public, private, and hidden state.");
+    expect(sc).toContain("The game package declares visibility.");
 
     // §16 visibility levels.
     expect(sc).toContain("- Public");
     expect(sc).toContain("- Private");
     expect(sc).toContain("- Hidden");
+
+    // §5a (v1.1) — Transient Entity.
+    expect(sc).toContain("Persistent and transient entities.");
+    expect(sc).toContain("Kind: Transient");
+    expect(sc).toContain("Lifetime: Simulation Phase");
 
     // §12 mutation constraint.
     expect(sc).toContain("only changes at the State Commit");
