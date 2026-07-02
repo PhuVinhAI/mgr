@@ -16,6 +16,7 @@ import { validate, type ValidateResult } from "./validator/index.js";
 import { bundle, type BundleResult } from "./bundler/index.js";
 import { optimize } from "./optimizer/index.js";
 import { t } from "./i18n/index.js";
+import { COMPILER_VERSION } from "./version.js";
 
 export interface CompileOptions {
   /** Project root directory (must contain mgr.config.json). */
@@ -24,6 +25,12 @@ export interface CompileOptions {
   sink?: LoggerSink;
   /** If false, skip writing to disk. Default: true. */
   write?: boolean;
+  /**
+   * Pin the Build Date recorded in PSF Metadata (§14). If omitted a
+   * fresh `new Date()` is used. Tests asserting Prompt Stability
+   * (§17) should pin this to keep output byte-identical.
+   */
+  buildDate?: Date;
 }
 
 export interface CompileResult {
@@ -110,7 +117,16 @@ export async function compile(
 
   // 4. Bundle.
   logger.stepStart("bundle");
-  const bundled = bundle(graph);
+  const buildDate = (options.buildDate ?? new Date()).toISOString();
+  const bundled = bundle({
+    graph,
+    metadata: {
+      project: config.name,
+      version: config.version,
+      buildDate,
+      compilerVersion: COMPILER_VERSION,
+    },
+  });
   logger.stepSuccess(
     "bundle",
     t((m) => m.stepDetail.bundleMerged, { count: bundled.order.length }),

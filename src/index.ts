@@ -64,7 +64,23 @@ export {
   type ValidateResult,
 } from "./validator/index.js";
 
-export { bundle, type BundleResult } from "./bundler/index.js";
+export {
+  bundle,
+  type BundleInput,
+  type BundleMetadata,
+  type BundleResult,
+} from "./bundler/index.js";
+
+export {
+  PSF_SECTIONS,
+  PSF_SPEC_VERSION,
+  psfSectionRank,
+  psfSectionTitle,
+  canonicalizeSectionId,
+  type PsfSectionDef,
+} from "./psf/index.js";
+
+export { COMPILER_VERSION } from "./version.js";
 
 export { optimize, type OptimizeResult } from "./optimizer/index.js";
 

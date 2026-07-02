@@ -154,10 +154,11 @@ describe("import rules (PRD-002 §8)", () => {
       ].join("\n"),
       "src/a.md": "@section a\n\nA body\n",
     });
-    const result = await compile({ root });
+    const result = await compile({ root, buildDate: new Date(0) });
     expect(result.validation.ok).toBe(true);
-    // Only one copy of the section survives.
-    const occurrences = result.output.match(/^## a$/gm)?.length ?? 0;
+    // Only one copy of the section survives. Custom section ids are
+    // rendered as an uppercase level-1 heading by PSF (PRD-003 §15).
+    const occurrences = result.output.match(/^# A$/gm)?.length ?? 0;
     expect(occurrences).toBe(1);
     await rm(root, { recursive: true, force: true });
   });
@@ -169,8 +170,8 @@ describe("import rules (PRD-002 §8)", () => {
       "src/main.md": "@import intro\n",
       "src/intro.md": "@section intro\n\nBody\n",
     });
-    const result = await compile({ root });
-    expect(result.output).toContain("## intro");
+    const result = await compile({ root, buildDate: new Date(0) });
+    expect(result.output).toContain("# INTRO");
     await rm(root, { recursive: true, force: true });
   });
 });

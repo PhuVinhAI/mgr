@@ -30,13 +30,21 @@ describe("pipeline", () => {
       "src/intro.md": "@section intro\n\nHello from intro.\n",
     });
 
-    const result = await compile({ root });
+    const result = await compile({ root, buildDate: new Date(0) });
     expect(result.validation.ok).toBe(true);
     expect(result.graph.documents.size).toBe(2);
     const written = await readFile(result.outputPath, "utf8");
-    expect(written).toContain("# Hello");
-    expect(written).toContain("## intro");
+    // PSF envelope must be present (PRD-003 §13, §14, §15).
+    expect(written).toContain("# smoke");
+    expect(written).toContain("## Metadata");
+    expect(written).toContain("## Table of Contents");
+    expect(written).toContain("# INTRO");
     expect(written).toContain("Hello from intro.");
+    // Free markdown outside a section becomes the PREAMBLE.
+    expect(written).toContain("# PREAMBLE");
+    expect(written).toContain("# Hello");
+    // §16 Prompt Purity: no @import in output.
+    expect(written).not.toContain("@import");
   });
 
   it("produces the exact same output for the same source (deterministic)", async () => {
@@ -48,8 +56,9 @@ describe("pipeline", () => {
     };
     const r1 = await makeProject(files);
     const r2 = await makeProject(files);
-    const b1 = await compile({ root: r1 });
-    const b2 = await compile({ root: r2 });
+    const buildDate = new Date(0);
+    const b1 = await compile({ root: r1, buildDate });
+    const b2 = await compile({ root: r2, buildDate });
     expect(b1.output).toBe(b2.output);
     await rm(r1, { recursive: true, force: true });
     await rm(r2, { recursive: true, force: true });
