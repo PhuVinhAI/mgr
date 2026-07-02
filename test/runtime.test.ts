@@ -29,6 +29,7 @@ describe("runtime catalog (PRD-004)", () => {
       "state-machine",
       "memory-model",
       "validation",
+      "state-contract",
       "output-contract",
     ]);
   });
@@ -49,7 +50,7 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
     if (root) await rm(root, { recursive: true, force: true });
   });
 
-  it("auto-injects all six runtime sections into a minimal build", async () => {
+  it("auto-injects all runtime sections into a minimal build", async () => {
     root = await makeProject({
       "mgr.config.json": JSON.stringify({
         name: "min",
@@ -68,6 +69,7 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
     expect(result.output).toMatch(/^---\n\n# STATE MACHINE$/m);
     expect(result.output).toMatch(/^---\n\n# MEMORY MODEL$/m);
     expect(result.output).toMatch(/^---\n\n# VALIDATION$/m);
+    expect(result.output).toMatch(/^---\n\n# STATE CONTRACT$/m);
     expect(result.output).toMatch(/^---\n\n# OUTPUT CONTRACT$/m);
 
     // The canonical turn-loop body encodes PRD-004 §4 literally.
@@ -87,6 +89,7 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
     expect(result.output).toMatch(/5\. Await Player Input/);
 
     // Bundle result reports the injected sections in canonical order.
+    // PSF §11 places state-contract after ui-contract, before game.
     expect(result.bundle.sectionOrder).toEqual([
       "system",
       "runtime",
@@ -94,6 +97,7 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
       "state-machine",
       "memory-model",
       "validation",
+      "state-contract",
       "output-contract",
     ]);
   });
@@ -124,7 +128,8 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
     expect(at("STATE MACHINE")).toBeGreaterThan(at("TURN LOOP"));
     expect(at("MEMORY MODEL")).toBeGreaterThan(at("STATE MACHINE"));
     expect(at("VALIDATION")).toBeGreaterThan(at("MEMORY MODEL"));
-    expect(at("OUTPUT CONTRACT")).toBeGreaterThan(at("VALIDATION"));
+    expect(at("STATE CONTRACT")).toBeGreaterThan(at("VALIDATION"));
+    expect(at("OUTPUT CONTRACT")).toBeGreaterThan(at("STATE CONTRACT"));
     expect(at("FIRST TURN")).toBeGreaterThan(at("OUTPUT CONTRACT"));
   });
 
@@ -173,8 +178,8 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
     expect(result.output).toContain(
       `- Runtime Spec Version: ${RUNTIME_SPEC_VERSION}`,
     );
-    // Version tracks the shape of the bodies. PRD-005 bumped it to 1.1.
-    expect(RUNTIME_SPEC_VERSION).toBe("1.1");
+    // Version tracks the shape of the bodies. PRD-006 bumped it to 1.2.
+    expect(RUNTIME_SPEC_VERSION).toBe("1.2");
   });
 
   it("stays deterministic across two builds with the same source", async () => {
@@ -264,5 +269,102 @@ describe("turn lifecycle content (PRD-005)", () => {
     expect(v).toContain("Narrative timing.");
     // §18 — never narrate a success then retract.
     expect(v.toLowerCase()).toContain("never describe an outcome before");
+  });
+});
+
+describe("state system content (PRD-006)", () => {
+  let root: string;
+  afterEach(async () => {
+    if (root) await rm(root, { recursive: true, force: true });
+  });
+
+  it("state-machine body carries SSoT and snapshot model", async () => {
+    const sm = runtimeSectionBody("state-machine") ?? "";
+    // §2 — single source of truth.
+    expect(sm).toContain("State as single source of truth.");
+    expect(sm.toLowerCase()).toContain("never infer from narrative");
+    // §3 — snapshot semantics.
+    expect(sm).toContain("State as snapshot.");
+    expect(sm).toContain("exactly one new snapshot");
+  });
+
+  it("state-contract body encodes the building blocks and layers", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({
+        name: "sc",
+        entry: "main.md",
+      }),
+      "src/main.md": "@section system\n\nS\n",
+    });
+    const result = await compile({ root, buildDate: new Date(0) });
+    const sc = runtimeSectionBody("state-contract") ?? "";
+
+    // §5–§10 building blocks are all mentioned by name.
+    for (const kind of [
+      "Entity",
+      "Property",
+      "Collection",
+      "Flag",
+      "Variable",
+      "Relationship",
+    ]) {
+      expect(sc).toContain(`- ${kind}.`);
+    }
+
+    // §11 public/hidden layers.
+    expect(sc).toContain("Public and hidden state.");
+    expect(sc).toContain("hidden state directly");
+
+    // §16 visibility levels.
+    expect(sc).toContain("- Public");
+    expect(sc).toContain("- Private");
+    expect(sc).toContain("- Hidden");
+
+    // §12 mutation constraint.
+    expect(sc).toContain("only changes at the State Commit");
+    expect(sc.toLowerCase()).toContain("never mutate state");
+
+    // §14 example invariants.
+    expect(sc).toContain("Money >= 0");
+    expect(sc).toContain("HP <= MaxHP");
+
+    // §17 history read-only.
+    expect(sc).toContain("State history.");
+    expect(sc).toContain("read-only");
+
+    // §18 Markdown, no JSON.
+    expect(sc).toContain("Serialization.");
+    expect(sc).toContain("never rely on JSON");
+
+    // §19 ownership.
+    expect(sc).toContain("Ownership.");
+    expect(sc).toContain("Only the runtime may create, modify, or delete state.");
+
+    // The bundle actually emits the heading with the canonical body.
+    expect(result.output).toMatch(/^---\n\n# STATE CONTRACT$/m);
+    expect(result.output).toContain("Serialization.");
+    expect(result.output).toContain("Money >= 0");
+  });
+
+  it("author-supplied state-contract overrides the canonical body", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({
+        name: "sc-over",
+        entry: "main.md",
+      }),
+      "src/main.md": [
+        "@section state-contract",
+        "",
+        "AUTHOR STATE CONTRACT.",
+      ].join("\n"),
+    });
+    const result = await compile({ root, buildDate: new Date(0) });
+    const occurrences =
+      result.output.match(/^# STATE CONTRACT$/gm)?.length ?? 0;
+    expect(occurrences).toBe(1);
+    expect(result.output).toContain("AUTHOR STATE CONTRACT.");
+    // The canonical serialization clause must NOT appear when the
+    // author has overridden the section.
+    expect(result.output).not.toContain("never rely on JSON");
   });
 });

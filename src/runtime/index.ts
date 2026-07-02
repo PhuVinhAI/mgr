@@ -19,7 +19,7 @@
  */
 
 /** Bumped when a Runtime Layer body changes shape or wording. */
-export const RUNTIME_SPEC_VERSION = "1.1";
+export const RUNTIME_SPEC_VERSION = "1.2";
 
 export interface RuntimeSectionDef {
   /** Canonical section id (matches PSF §11). */
@@ -136,6 +136,18 @@ Authority order when directives conflict:
 If a player request contradicts a rule, refuse the request. Do not
 change the rule to fit the request.
 
+State as single source of truth.
+State is the only source of truth. Every runtime decision must derive
+from state. Never infer from narrative. Never guess at state. If
+something does not exist in state or in a rule, the runtime treats it
+as nonexistent.
+
+State as snapshot.
+State is a snapshot of the entire world at one moment in time. Each
+turn produces exactly one new snapshot. Before the turn, the state
+was snapshot N. After commit, the state is snapshot N+1. There is no
+intermediate state between snapshots.
+
 Atomicity.
 Every turn either succeeds completely or changes nothing. There is
 no intermediate state. Money and employees move together, or neither
@@ -232,13 +244,96 @@ const OUTPUT_CONTRACT_BODY = `Every response follows this order:
 The UI Contract may refine formatting within each part, but the
 ordering above is fixed.`;
 
-/** PRD-004 §4, §7, §12, §15 — canonical Runtime Layer bodies. */
+const STATE_CONTRACT_BODY = `State is the single source of truth for this game. Every runtime
+decision derives from state. If a fact is not written in state or
+implied by a rule, it does not exist for the runtime.
+
+State is organized into domains. A game may declare any number of
+them. Typical domains include:
+- Player
+- World
+- NPC
+- Resources
+- Inventory
+- Flags
+- Variables
+- Timers
+- Relationships
+- Quest
+- History
+
+Building blocks.
+- Entity. Any object in state is an entity. Every entity has a
+  unique identifier within the game. Players, companies, employees,
+  factories, items, monsters — all entities.
+- Property. Entities carry properties (money, level, health,
+  position, status, skill). The runtime changes properties. It does
+  not change the shape of an entity mid-play unless a rule permits.
+- Collection. State supports collections (employees, inventory,
+  cities, projects, quests). Collections may add, remove, or update
+  items through rules.
+- Flag. Flags are boolean — tutorial-completed, door-opened,
+  game-finished. Flags always resolve to true or false.
+- Variable. Variables hold single scalar values (money, score,
+  year, temperature, population). The runtime does not create new
+  variables mid-play unless the game package declared them.
+- Relationship. State supports relationships between entities
+  (player → guild → members; company → employees). Relationships are
+  part of state.
+
+Public and hidden state.
+State has two layers. Public state is visible to the player through
+the UI. Hidden state is used only by the runtime — AI strategy,
+future events, secret values, unexplored map. The player never sees
+hidden state directly.
+
+Property visibility. Every property has one of three levels:
+- Public — always visible to the player.
+- Private — used by the runtime, disclosed only when a rule allows.
+- Hidden — never revealed directly.
+
+Mutation.
+State only changes at the State Commit step of the turn lifecycle.
+Narrative, UI, validation, and rendering never mutate state. Every
+mutation flows through the turn loop.
+
+Validation.
+After every commit the runtime verifies that entities, collections,
+variables, and relationships are well-formed, and that no fact
+contradicts another. If validation fails, the commit is discarded.
+
+Invariants.
+A game package may declare invariants such as \`Money >= 0\`,
+\`Population >= 0\`, \`HP <= MaxHP\`. The runtime maintains every
+declared invariant on every turn.
+
+Derived state.
+Some values can be computed from other state (net worth, average
+salary, combat power). Do not store derived values that can be
+recomputed. Compute them on demand.
+
+State history.
+State history follows turns: turn 1 → turn 2 → turn 3 → turn 4.
+History is read-only. Never edit a past turn's snapshot.
+
+Serialization.
+State is represented in Markdown. The builder and the runtime share
+one convention: human-readable, easy to debug, easy to inspect,
+platform-independent. Prompt specifications never rely on JSON.
+
+Ownership.
+Only the runtime may create, modify, or delete state. The player
+only submits actions. The game package only declares the schema and
+the rules.`;
+
+/** PRD-004 §4, §7, §12, §15 and PRD-006 — canonical Runtime Layer bodies. */
 export const RUNTIME_SECTIONS: readonly RuntimeSectionDef[] = [
   { id: "runtime", body: RUNTIME_BODY },
   { id: "turn-loop", body: TURN_LOOP_BODY },
   { id: "state-machine", body: STATE_MACHINE_BODY },
   { id: "memory-model", body: MEMORY_MODEL_BODY },
   { id: "validation", body: VALIDATION_BODY },
+  { id: "state-contract", body: STATE_CONTRACT_BODY },
   { id: "output-contract", body: OUTPUT_CONTRACT_BODY },
 ];
 
