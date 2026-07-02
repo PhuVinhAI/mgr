@@ -156,6 +156,12 @@ export const vi: Messages = {
         message: "Không ghi được file output",
         suggestion: "Kiểm tra đường dẫn outDir và quyền ghi file.",
       },
+      RUNTIME_INCOMPATIBLE: {
+        message:
+          "Game Package yêu cầu Runtime {target}, nhưng compiler đang có Runtime {actual}",
+        suggestion:
+          "Sửa `runtime` trong mgr.config.json thành mục tiêu tương thích (ví dụ `{actualMajor}.x`), hoặc cài đặt compiler khớp với package.",
+      },
       INTERNAL: {
         message: "Lỗi nội bộ của compiler",
         suggestion: "Vui lòng báo cáo kèm theo nguồn gây lỗi.",

@@ -47,6 +47,12 @@ export interface BundleMetadata {
   buildDate: string;
   /** Compiler version (mgr package version). */
   compilerVersion: string;
+  /** Optional author (PRD-008 §4). */
+  author?: string;
+  /** Optional package description (PRD-008 §4). */
+  description?: string;
+  /** Optional declared target Runtime version (PRD-008 §16). */
+  runtimeTarget?: string;
 }
 
 export interface BundleInput {
@@ -161,6 +167,9 @@ function renderMetadata(m: BundleMetadata): string {
   lines.push("");
   lines.push(`- Project: ${m.project}`);
   lines.push(`- Version: ${m.version}`);
+  if (m.author) lines.push(`- Author: ${m.author}`);
+  if (m.description) lines.push(`- Description: ${m.description}`);
+  if (m.runtimeTarget) lines.push(`- Target Runtime: ${m.runtimeTarget}`);
   lines.push(`- Build Date: ${m.buildDate}`);
   lines.push(`- Compiler Version: ${m.compilerVersion}`);
   lines.push(`- Specification Version: ${PSF_SPEC_VERSION}`);

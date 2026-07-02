@@ -23,6 +23,7 @@ export type MgrErrorCode =
   | "DEPENDENCY_CYCLE"
   | "EMPTY_PROJECT"
   | "WRITE_FAILED"
+  | "RUNTIME_INCOMPATIBLE"
   | "INTERNAL";
 
 export interface MgrErrorLocation {

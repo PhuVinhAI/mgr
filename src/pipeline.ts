@@ -9,6 +9,7 @@ import { Logger, nullSink, type LoggerSink } from "./logger/index.js";
 import {
   DEFAULT_CONFIG,
   parseConfig,
+  isRuntimeCompatible,
   type MgrConfig,
 } from "./config/index.js";
 import { buildGraph, type ProjectGraph } from "./graph/index.js";
@@ -17,6 +18,7 @@ import { bundle, type BundleResult } from "./bundler/index.js";
 import { optimize } from "./optimizer/index.js";
 import { t } from "./i18n/index.js";
 import { COMPILER_VERSION } from "./version.js";
+import { RUNTIME_SPEC_VERSION } from "./runtime/index.js";
 
 export interface CompileOptions {
   /** Project root directory (must contain mgr.config.json). */
@@ -84,6 +86,21 @@ export async function compile(
   const config = await loadConfig(root);
   logger.stepSuccess("load-project", `${config.name}@${config.version}`);
 
+  // 1b. PRD-008 §16 — enforce Game Package / Runtime compatibility.
+  if (config.runtime && !isRuntimeCompatible(RUNTIME_SPEC_VERSION, config.runtime)) {
+    const actualMajor = RUNTIME_SPEC_VERSION.split(".")[0] ?? "1";
+    throw new MgrError({
+      code: "RUNTIME_INCOMPATIBLE",
+      messageKey: "RUNTIME_INCOMPATIBLE",
+      params: {
+        target: config.runtime,
+        actual: RUNTIME_SPEC_VERSION,
+        actualMajor,
+      },
+      location: { file: path.join(root, CONFIG_FILE) },
+    });
+  }
+
   const srcDir = path.join(root, config.srcDir);
 
   // 2. Load + Parse (folded into graph build).
@@ -125,6 +142,9 @@ export async function compile(
       version: config.version,
       buildDate,
       compilerVersion: COMPILER_VERSION,
+      ...(config.author ? { author: config.author } : {}),
+      ...(config.description ? { description: config.description } : {}),
+      ...(config.runtime ? { runtimeTarget: config.runtime } : {}),
     },
   });
   logger.stepSuccess(

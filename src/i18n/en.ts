@@ -157,6 +157,12 @@ export const en: Messages = {
         message: "Cannot write output file",
         suggestion: "Check the outDir path and file permissions.",
       },
+      RUNTIME_INCOMPATIBLE: {
+        message:
+          "Game Package targets Runtime {target}, but this compiler ships Runtime {actual}",
+        suggestion:
+          "Update `runtime` in mgr.config.json to a compatible target (e.g. `{actualMajor}.x`), or install a compiler that matches the package.",
+      },
       INTERNAL: {
         message: "Internal compiler error",
         suggestion: "Please report this along with the source that triggered it.",

@@ -38,6 +38,7 @@ export interface ErrorCatalog {
   DEPENDENCY_CYCLE: { message: string; suggestion: string };
   EMPTY_PROJECT: { message: string; suggestion: string };
   WRITE_FAILED: { message: string; suggestion: string };
+  RUNTIME_INCOMPATIBLE: { message: string; suggestion: string };
   INTERNAL: { message: string; suggestion: string };
 }
 

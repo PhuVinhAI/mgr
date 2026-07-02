@@ -23,6 +23,7 @@ export {
   parseConfig,
   DEFAULT_CONFIG,
   MgrConfigSchema,
+  isRuntimeCompatible,
   type MgrConfig,
 } from "./config/index.js";
 
