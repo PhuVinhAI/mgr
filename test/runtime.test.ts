@@ -79,6 +79,14 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
     // 11 steps after PRD-005 §7/§7a split Event into Pre and Post.
     expect(result.output).toContain("11. WAIT NEXT TURN");
 
+    // PRD-011 §3 execution model semantics live in the turn-loop body.
+    expect(result.output).toContain("Rule execution within a phase.");
+    expect(result.output).toContain("Each rule applies as a unit.");
+
+    // PRD-012 §3 Action Resolution — intent matching before Guard.
+    expect(result.output).toContain("intent matching");
+    expect(result.output).toContain("reserved intents");
+
     // Authority order from §7 is present in the state-machine body.
     expect(result.output).toContain("1. System Layer");
     expect(result.output).toContain("5. Player Input");
@@ -183,9 +191,9 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
     expect(result.output).toContain(
       `- Runtime Spec Version: ${RUNTIME_SPEC_VERSION}`,
     );
-    // Version tracks the shape of the bodies. PRD-005 §7/§7a and
-    // PRD-006 §5a/§11a bumped it to 1.4.
-    expect(RUNTIME_SPEC_VERSION).toBe("1.4");
+    // Version tracks the shape of the bodies. PRD-011/012/013 bumped
+    // it to 1.5.
+    expect(RUNTIME_SPEC_VERSION).toBe("1.5");
   });
 
   it("stays deterministic across two builds with the same source", async () => {
@@ -355,6 +363,11 @@ describe("state system content (PRD-006)", () => {
     // §19 ownership.
     expect(sc).toContain("Ownership.");
     expect(sc).toContain("Only the runtime may create, modify, or delete state.");
+
+    // PRD-013 §3 Query/Selector semantics — pure, read-only, snapshot-scoped.
+    expect(sc).toContain("Queries and selectors.");
+    expect(sc).toContain("Collection where Predicate");
+    expect(sc).toContain("they never mutate");
 
     // The bundle actually emits the heading with the canonical body.
     expect(result.output).toMatch(/^---\n\n# STATE CONTRACT$/m);

@@ -61,9 +61,13 @@ in the entry.
 - [x] Author has walked all 11 GPS sections for Lemonade
 - [x] All arbitrary decisions carry a `TODO(gap)` in-source
 - [x] Every `TODO(gap)` has a matching entry below
-- [x] Gaps triaged into PRD amendments and new PRDs
-- [x] Lemonade rewritten to use the resolved syntax
-- [x] Compiler + tests updated to enforce the new surface
+- [x] Round 1 gaps triaged into PRD amendments and new PRDs
+- [x] Round 1: Lemonade rewritten to use the resolved syntax
+- [x] Round 1: Compiler + tests updated to enforce the new surface
+- [x] Round 2 gaps identified (execution model, action resolution, query, RFC-style)
+- [x] Round 2 gaps triaged into 3 new PRDs (011/012/013) + PRD-008 amendment
+- [x] Round 2: Lemonade rewritten to RFC-style Section Schema
+- [x] Round 2: Compiler + validator + tests updated (74/74 passing)
 
 ---
 
@@ -229,9 +233,9 @@ Wrote English prose. Everything was implicit.
 
 ---
 
-## Triage summary
+## Round 1 triage summary
 
-All 5 gaps closed by 2 new PRDs + 3 amendments:
+All 5 Round 1 gaps closed by 2 new PRDs + 3 amendments:
 
 | Gap | Resolution |
 | --- | --- |
@@ -241,17 +245,175 @@ All 5 gaps closed by 2 new PRDs + 3 amendments:
 | GAP-004 | PRD-005 v1.1 §7 + §7a |
 | GAP-005 | **PRD-010 (new)** — Rule Language |
 
-**Code impact:**
+**Round 1 code impact:**
 - `RUNTIME_SPEC_VERSION` bumped 1.3 → 1.4 (turn-loop + state-contract).
 - `PSF_SPEC_VERSION` bumped 1.0 → 1.1 (visibility preservation).
 - 17 new directive names reserved for future syntax (PRD-005/006/009/010).
 - 3 runtime tests updated + 2 new tests added; 61/61 passing.
 
+---
+
+## Round 2 gaps
+
+After Round 1, a re-read of the rewritten Lemonade exposed a second
+layer of missing kernel semantics — not "how to write" (Round 1
+closed that) but "how to execute" and "how to enforce structure".
+
+### GAP-006 — Rule Execution Model  ✅ CLOSED
+
+**File:** `src/rules.md`
+**PRDs consulted:** PRD-010 §9, §10 (Rule Language)
+**Category:** rule
+
+**What I needed to decide:**
+`SellOneCup` mutates 5 variables in one Effect block. What is the
+execution order? Are all 5 atomic? If `Ice -= IcePerCup` violates
+`Ice >= 0`, do the first two mutations still commit? When Rule A
+and Rule B both mutate `Money` in the same Phase, who wins?
+`Priority` alone does not answer conflict policy for `:=` vs `+=`
+vs `×=`.
+
+**What the PRDs said:**
+PRD-010 §9 said Effects were "atomic" but did not define atomicity
+or rollback. §10 said "higher Priority runs first" but did not
+define what happens on ties, or how additive/multiplicative
+modifiers compose, or whether Rules read the Turn-Start snapshot or
+intermediate state.
+
+**Resolution:**
+- **PRD-011 Rule Execution Model** (new) — 20 sections covering the
+  Match → Sort → Prepare → Apply → Verify → Commit pipeline, Turn
+  Start Snapshot semantics, atomic-per-Rule, invariant rollback,
+  Conflict Policy per operator, Modifier Layering, forbidden
+  read-after-write.
+- Runtime `turn-loop` body (v1.5) — "Rule execution within a phase"
+  paragraph teaches the LLM the model in prose.
+- `rules.md` extended with explicit `Priority:` blocks and a
+  higher-Priority `ApplyShortage` Rule that demonstrates modifier
+  layering.
+
+---
+
+### GAP-007 — Action Resolution  ✅ CLOSED
+
+**File:** `src/actions.md`
+**PRDs consulted:** PRD-008 §10, PRD-005 §5
+**Category:** runtime
+
+**What I needed to decide:**
+When Player types "buy 20 lemons", how does Runtime pick the Action
+`Buy Lemons` and extract `Quantity = 20`? What if they type just
+"buy" — ambiguous between Lemons/Sugar/Ice? What if they type
+"help"? PRD-008 §10 said "Runtime maps free text to a valid Action
+or rejects" but did not say how.
+
+**What the PRDs said:**
+Nothing. `INPUT_UNRESOLVED` was a phrase in PRD-005 §5 without a
+resolution algorithm attached.
+
+**Resolution:**
+- **PRD-012 Action Resolution** (new) — 20 sections covering
+  Normalize → Match Intent → Extract Params, Ambiguity handling,
+  Reserved Intents (help/quit/retry), Auto Actions, Passthrough
+  parameters.
+- Runtime `turn-loop` body (v1.5) — Input Phase description adds
+  "intent matching before validation begins; reserved intents always
+  win over game actions".
+- `actions.md` rewritten with explicit `Action <Name>` + `Intent:` +
+  `Parameters:` + `Preconditions:` blocks. `End Day` moved to
+  `Auto Action` with a `Fires When:` guard.
+
+---
+
+### GAP-008 — Query & Selector  ✅ CLOSED
+
+**File:** future games (not stressed by Lemonade)
+**PRDs consulted:** PRD-006 §7 (Collection), PRD-009 §12 (Aggregation)
+**Category:** state
+
+**What I needed to decide:**
+Once games grow past scalar variables (Game Dev Tycoon has hundreds
+of Employees, Projects, Reviews), Rules need to filter / project /
+aggregate Collections. PRD-006 §7 said Collections exist. PRD-009
+§12 had `Sum` / `Count` / `Average` but no filter, no ordering, no
+quantifiers (`Any` / `All`), no First/Last.
+
+**What the PRDs said:**
+Almost nothing. Rules would have to describe queries in free English.
+
+**Resolution:**
+- **PRD-013 Query & Selector System** (new) — 20 sections covering
+  `Source where Predicate select Projection order by Key limit N`,
+  aggregation, quantifiers, First/Last, Named Queries.
+- Runtime `state-contract` body (v1.5) — new "Queries and selectors"
+  paragraph so the LLM knows selectors are pure and snapshot-scoped.
+- Not applied to Lemonade (no Collection stress). Waiting for
+  Reference Game #3 (Business Mini) to prove it end-to-end.
+
+---
+
+### GAP-009 — Section Schema (RFC-style refactor)  ✅ CLOSED
+
+**File:** all Game Package files
+**PRDs consulted:** PRD-008 §8/§9/§10, PRD-010 §5, PRD-012 §4
+**Category:** package
+
+**What I needed to decide:**
+PRD-010 defined block-form Rule syntax. PRD-012 did the same for
+Action. PRD-006 §11a did the same for Variable. But GPS (PRD-008)
+did not **enforce** that every declaration follow its schema. Games
+could mix free prose ("Buy Lemons: the player…") with machine-
+readable declarations. LLM had to guess structure per Turn.
+
+**What the PRDs said:**
+Nothing at Package level. Individual PRDs specified their own kind
+but the enforcement gap left GPS silent.
+
+**Resolution:**
+- **PRD-008 v1.1 §15a Section Schema** — consolidates schema-per-
+  kind for Variable / Entity / Formula / Rule / Event / Action /
+  Query. Required and forbidden blocks per Kind. §15a.9 splits
+  docs-only files from build-included files. §15a.10 defines error
+  codes.
+- **Section Schema Validator** (`src/validator/schema.ts`) — line
+  scanner + block registry with alias handling and multi-line HTML
+  comment awareness. Wired into `validate(graph)` pass.
+- 5 new i18n error codes added to `en.ts` + `vi.ts`.
+- Lemonade rewritten fully to RFC-style: every Rule, Action, Event,
+  Entity, Variable declares its blocks explicitly. Build passes.
+
+---
+
+## Round 2 triage summary
+
+| Gap | Resolution |
+| --- | --- |
+| GAP-006 | **PRD-011 (new)** — Rule Execution Model |
+| GAP-007 | **PRD-012 (new)** — Action Resolution |
+| GAP-008 | **PRD-013 (new)** — Query & Selector |
+| GAP-009 | PRD-008 v1.1 §15a + Section Schema Validator |
+
+**Round 2 code impact:**
+- `RUNTIME_SPEC_VERSION` bumped 1.4 → 1.5 (turn-loop rule execution +
+  input resolution paragraphs; state-contract queries paragraph).
+- 33 new directive names reserved for future syntax
+  (PRD-008 §15a + PRD-011 + PRD-012 + PRD-013).
+- New `src/validator/schema.ts` (line-scan + per-kind schema).
+- 5 new error codes added to i18n catalog (en + vi).
+- New `test/section-schema.test.ts` with 12 tests covering the
+  validator surface.
+- Registry test extended for the 33 new reserved names.
+- Runtime test bumped to v1.5 + PRD-011/012/013 body assertions.
+- Total: 74/74 tests passing.
+
 **Next step:**
 Reference Game #2 to expose gaps NOT covered by Lemonade. Candidates:
 
-- Tic-Tac-Toe → tests adversary/turn-of, End Conditions symmetry
-- Hangman → tests progressive reveal (Private → Public transitions)
-- Business Mini → tests multiple Persistent Entities + Collections
+- Tic-Tac-Toe → tests adversary/turn-of, End Conditions symmetry.
+- Hangman → progressive reveal (Private → Public transitions) and
+  heavy Action Resolution (single-letter input, ambiguity).
+- Business Mini → multiple Persistent Entities + Collections;
+  stresses PRD-013 Query & Selector.
 
-Choose based on what Lemonade did not stress.
+PRD-013 in particular remains unstressed by Lemonade; Business Mini
+would be the first game to force it.

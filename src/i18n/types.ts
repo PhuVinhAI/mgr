@@ -39,6 +39,11 @@ export interface ErrorCatalog {
   EMPTY_PROJECT: { message: string; suggestion: string };
   WRITE_FAILED: { message: string; suggestion: string };
   RUNTIME_INCOMPATIBLE: { message: string; suggestion: string };
+  SECTION_SCHEMA_MISSING_BLOCK: { message: string; suggestion: string };
+  SECTION_SCHEMA_FORBIDDEN_BLOCK: { message: string; suggestion: string };
+  SECTION_SCHEMA_UNKNOWN_BLOCK: { message: string; suggestion: string };
+  SECTION_SCHEMA_DUPLICATE_BLOCK: { message: string; suggestion: string };
+  SECTION_SCHEMA_MISSING_KIND: { message: string; suggestion: string };
   INTERNAL: { message: string; suggestion: string };
 }
 

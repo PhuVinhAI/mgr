@@ -4,6 +4,9 @@
  * Rules Foundation enforces (PRD §6 · Validator):
  *   1. Duplicate section ids across the whole project.
  *   2. Empty project (entry loaded but no content).
+ *   3. Section Schema declarations (PRD-008 §15a) — every Rule /
+ *      Entity / Variable / Formula / Event / Action / Query
+ *      declaration carries its required blocks and no forbidden ones.
  *
  * Rules already caught earlier in the pipeline:
  *   - Missing file / bad import → graph builder.
@@ -16,6 +19,9 @@ import * as path from "node:path";
 import { MgrError, MgrErrorList } from "../errors/index.js";
 import type { ProjectGraph } from "../graph/index.js";
 import type { SectionNode } from "../parser/ast.js";
+import { validateSectionSchema } from "./schema.js";
+
+export { validateSectionSchema };
 
 export interface ValidateResult {
   ok: boolean;
@@ -77,6 +83,11 @@ export function validate(graph: ProjectGraph): ValidateResult {
       }),
     );
   }
+
+  // 3. Section Schema (PRD-008 §15a).
+  const schema = validateSectionSchema(graph);
+  errors.push(...schema.errors);
+  warnings.push(...schema.warnings);
 
   return {
     ok: errors.length === 0,

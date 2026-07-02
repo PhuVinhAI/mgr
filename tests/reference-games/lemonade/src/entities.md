@@ -1,6 +1,7 @@
 @section entities
 
-<!-- PRD-008 §7 Entity Definition + PRD-006 §5a Transient Entity (v1.1). -->
+<!-- PRD-008 §7 Entity Definition + PRD-006 §5a Transient Entity (v1.1)
+     + PRD-008 §15a.2 Section Schema. -->
 
 ## Player
 
@@ -40,8 +41,8 @@ Lifetime: Simulation Phase
      the snapshot, never appears in Turn History. -->
 
 Attributes:
-Cost (derived), Revenue (derived)
+Cost, Revenue
 
 Behaviour:
-Instantiated once per Customer served during Simulation, then
-discarded when the phase ends.
+Instantiated once per Customer served during Simulation, then discarded
+when the phase ends.

@@ -163,6 +163,36 @@ export const en: Messages = {
         suggestion:
           "Update `runtime` in mgr.config.json to a compatible target (e.g. `{actualMajor}.x`), or install a compiler that matches the package.",
       },
+      SECTION_SCHEMA_MISSING_BLOCK: {
+        message:
+          "{kind} \"{name}\" is missing required block \"{block}\"",
+        suggestion:
+          "Add a `{block}:` block under `{kind} {name}`. See PRD-008 §15a for the schema.",
+      },
+      SECTION_SCHEMA_FORBIDDEN_BLOCK: {
+        message:
+          "{kind} \"{name}\" (Kind: {subKind}) must not declare block \"{block}\"",
+        suggestion:
+          "Remove `{block}:` from this declaration, or change the Kind. See PRD-008 §15a.4.",
+      },
+      SECTION_SCHEMA_UNKNOWN_BLOCK: {
+        message:
+          "Unknown block \"{block}\" under {kind} \"{name}\"",
+        suggestion:
+          "Block names must appear in PRD-008 §15a. Check the spelling, or move this content into `Behaviour:` for prose.",
+      },
+      SECTION_SCHEMA_DUPLICATE_BLOCK: {
+        message:
+          "Duplicate block \"{block}\" under {kind} \"{name}\"",
+        suggestion:
+          "Merge the two `{block}:` blocks. Each block name is declared at most once.",
+      },
+      SECTION_SCHEMA_MISSING_KIND: {
+        message:
+          "{kind} \"{name}\" is missing required `Kind:` block",
+        suggestion:
+          "Declare `Kind:` explicitly (Guard | Transformation | Trigger for Rule, Persistent | Transient for Entity). See PRD-008 §15a.",
+      },
       INTERNAL: {
         message: "Internal compiler error",
         suggestion: "Please report this along with the source that triggered it.",

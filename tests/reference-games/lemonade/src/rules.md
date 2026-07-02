@@ -1,23 +1,28 @@
 @section rules
 
-<!-- PRD-008 §8 Rules + PRD-010 Rule Language + PRD-009 Formula System. -->
+<!-- PRD-008 §8 Rules + PRD-008 §15a.4 Section Schema +
+     PRD-010 Rule Language + PRD-009 Formula System +
+     PRD-011 Rule Execution Model. -->
 
 ## Named formulas
 
-<!-- PRD-009 §14 Named formulas — reusable formulas resolve at Build time. -->
+<!-- PRD-009 §14 Named formulas — resolve at Build time. -->
 
 Formula BaseDemand
-Reputation × 0.5 + 10
+Reputation * 0.5 + 10
 
 Formula WeatherModifier
 When Weather = Rainy      Then 0.5
 When Weather = Heat Wave  Then 2.0
 Otherwise                 Then 1.0
 
+Formula CustomersToday
+BaseDemand * WeatherModifier - Price * 0.05
+
 ## Purchase rules
 
-<!-- PRD-010 §4 Guard + §13 Transformation pattern. Precondition uses
-     PRD-009 §7 comparison and §6 arithmetic. -->
+<!-- Guard per §15a.4: Trigger + Precondition, no Effect.
+     Transformation per §15a.4: Trigger + Precondition + Effect. -->
 
 Rule CanBuyLemons
 
@@ -27,7 +32,7 @@ Trigger:
 On Action(Buy Lemons)
 
 Precondition:
-Money ≥ Quantity × 5
+Money >= Quantity * 5
 
 Rule ApplyBuyLemons
 
@@ -37,11 +42,14 @@ Trigger:
 On Action(Buy Lemons)
 
 Precondition:
-Money ≥ Quantity × 5
+Money >= Quantity * 5
 
 Effect:
-Money -= Quantity × 5
+Money -= Quantity * 5
 Lemons += Quantity
+
+Priority:
+0
 
 Rule CanBuySugar
 
@@ -51,7 +59,7 @@ Trigger:
 On Action(Buy Sugar)
 
 Precondition:
-Money ≥ Quantity × 3
+Money >= Quantity * 3
 
 Rule ApplyBuySugar
 
@@ -61,11 +69,14 @@ Trigger:
 On Action(Buy Sugar)
 
 Precondition:
-Money ≥ Quantity × 3
+Money >= Quantity * 3
 
 Effect:
-Money -= Quantity × 3
+Money -= Quantity * 3
 Sugar += Quantity
+
+Priority:
+0
 
 Rule CanBuyIce
 
@@ -75,7 +86,7 @@ Trigger:
 On Action(Buy Ice)
 
 Precondition:
-Money ≥ Quantity × 2
+Money >= Quantity * 2
 
 Rule ApplyBuyIce
 
@@ -85,16 +96,19 @@ Trigger:
 On Action(Buy Ice)
 
 Precondition:
-Money ≥ Quantity × 2
+Money >= Quantity * 2
 
 Effect:
-Money -= Quantity × 2
+Money -= Quantity * 2
 Ice += Quantity
 
-## Selling rules
+Priority:
+0
 
-<!-- PRD-010 §14 Trigger Rule pattern — runs during Simulation, one
-     Cup at a time until an ingredient is depleted. -->
+## Selling rule
+
+<!-- One cup per iteration. Runtime iterates until an ingredient runs
+     out or Customers reaches 0 (PRD-011 §7 Effect Evaluation Order). -->
 
 Rule SellOneCup
 
@@ -104,7 +118,7 @@ Trigger:
 On Action(Start Selling)
 
 Precondition:
-Lemons ≥ 1 AND Sugar ≥ 1 AND Ice ≥ IcePerCup AND Customers ≥ 1
+Lemons >= 1 AND Sugar >= 1 AND Ice >= IcePerCup AND Customers >= 1
 
 Effect:
 Lemons -= 1
@@ -113,16 +127,12 @@ Ice -= IcePerCup
 Customers -= 1
 Money += Price
 
+Priority:
+0
+
 ## Demand rule
 
-<!-- PRD-009 §11 Monotonic hints — the demand curve is not fully
-     specified, only the direction. -->
-
-Formula CustomersToday
-BaseDemand × WeatherModifier - Price × 0.05
-
-Monotonic(CustomersToday, Increases With Reputation)
-Monotonic(CustomersToday, Decreases With Price)
+<!-- PRD-009 §11 Monotonic hints — direction only, not full formula. -->
 
 Rule RollCustomers
 
@@ -133,6 +143,29 @@ On Pre Event
 
 Effect:
 Customers := Max(0, Round(CustomersToday))
+
+Priority:
+5
+
+Rule ApplyShortage
+
+<!-- Priority higher than SellOneCup so the shortage effect resolves
+     before Simulation reads the ingredient cost (PRD-011 §11 Modifier
+     Layering). -->
+
+Kind: Trigger
+
+Trigger:
+On Pre Event
+
+Precondition:
+SupplyShortageChance = 1
+
+Effect:
+LemonPrice := 10
+
+Priority:
+10
 
 ## Overnight rule
 
@@ -149,12 +182,16 @@ Effect:
 Ice := 0
 Day += 1
 IcePerCup := 1
+SupplyShortageChance := 0
+LemonPrice := 5
+
+Priority:
+0
 
 ## Rule priority
 
-<!-- PRD-010 §10 Priority + PRD-005 §8 Rule Resolution. -->
-
-Only Game Rules and Event Rules exist in this game. When both apply
-in the same phase, Priority is used; higher runs first. Guards run
-during Validation, Transformations during Simulation, Triggers during
-their declared phase.
+<!-- PRD-010 §10 Priority + PRD-005 §8 Rule Resolution + PRD-011 §10
+     Conflict Policy. When two Rules touch the same Variable in the
+     same Phase, higher Priority runs first. Same Priority: additive
+     ops sum, multiplicative ops compose, `:=` requires an explicit
+     winner. -->

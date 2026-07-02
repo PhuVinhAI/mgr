@@ -59,10 +59,10 @@ export interface DirectiveDefinition {
  * DIRECTIVE_RESERVED when it encounters one that no Foundation
  * handler owns yet.
  *
- * The second block reserves names claimed by PRD-005 §7/§7a, PRD-006
- * §5a/§11a, PRD-009, and PRD-010. Reserving them now keeps user files
- * from squatting on directives whose syntax lands in later Foundation
- * releases.
+ * The later blocks reserve names claimed by PRD-005 §7/§7a, PRD-006
+ * §5a/§11a, PRD-008 §15a, PRD-009, PRD-010, PRD-011, PRD-012, and
+ * PRD-013. Reserving them now keeps user files from squatting on
+ * directives whose syntax lands in later Foundation releases.
  */
 export const RESERVED_DIRECTIVES: ReadonlySet<string> = new Set([
   // PRD-002 §11 originals
@@ -107,6 +107,39 @@ export const RESERVED_DIRECTIVES: ReadonlySet<string> = new Set([
   "trigger",
   "guard",
   "priority",
+  // PRD-008 §15a Section Schema (shared block names)
+  "kind",
+  "attributes",
+  "behaviour",
+  "relationships",
+  "phase",
+  "lifetime",
+  "type",
+  "default",
+  "domain",
+  // PRD-012 Action Resolution
+  "action",
+  "intent",
+  "parameters",
+  "auto-action",
+  "reserved-intent",
+  "passthrough",
+  // PRD-013 Query & Selector
+  "query",
+  "where",
+  "select",
+  "order-by",
+  "limit",
+  "first",
+  "last",
+  "any",
+  "all",
+  "none",
+  // PRD-011 Rule Execution Model
+  "atomic",
+  "rollback",
+  "conflict-policy",
+  "snapshot",
 ]);
 
 export class DirectiveRegistry {

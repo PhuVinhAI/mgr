@@ -1,94 +1,80 @@
 @section actions
 
-<!-- PRD-008 §10 Actions -->
+<!-- PRD-008 §10 Actions + PRD-008 §15a.6 Section Schema +
+     PRD-012 Action Resolution. -->
 
-## Available actions
+## Actions
 
-Buy Lemons
-Buy Sugar
-Buy Ice
-Set Price
-Start Selling
-End Day
+<!-- Effects live in Rule Transformations (see rules.md). Actions declare
+     only Intent, Parameters, and Preconditions per §15a.6. -->
 
-## Action details
+Action Buy Lemons
 
-### Buy Lemons
+Intent:
+buy lemons
+purchase lemons
+grab lemons
 
-Input:
-quantity (positive integer)
-
-Preconditions:
-Money >= quantity × 5, Day has not started selling yet.
-
-Effect:
-Money -= quantity × 5. Lemons += quantity.
-
-### Buy Sugar
-
-Input:
-quantity (positive integer)
+Parameters:
+Quantity: Integer
 
 Preconditions:
-Money >= quantity × 3, Day has not started selling yet.
+Quantity >= 1 AND Money >= Quantity * 5
 
-Effect:
-Money -= quantity × 3. Sugar += quantity.
+Action Buy Sugar
 
-### Buy Ice
+Intent:
+buy sugar
+purchase sugar
+grab sugar
 
-Input:
-quantity (positive integer)
-
-Preconditions:
-Money >= quantity × 2, Day has not started selling yet.
-
-Effect:
-Money -= quantity × 2. Ice += quantity.
-
-### Set Price
-
-Input:
-price in cents (non-negative integer)
+Parameters:
+Quantity: Integer
 
 Preconditions:
-Day has not started selling yet.
+Quantity >= 1 AND Money >= Quantity * 3
 
-Effect:
-Price := input.
+Action Buy Ice
 
-### Start Selling
+Intent:
+buy ice
+purchase ice
+grab ice
 
-Input:
-none
-
-Preconditions:
-Price has been set at least once for this day.
-
-Effect:
-Runtime enters Simulation Phase for the day. Customers arrive, cups are
-sold until an ingredient runs out or all Customers have been served.
-
-### End Day
-
-<!-- Emitted automatically by Runtime after Start Selling completes. Not
-     player-callable. Included for completeness. -->
-
-Input:
-none
+Parameters:
+Quantity: Integer
 
 Preconditions:
-Simulation Phase for the day has completed.
+Quantity >= 1 AND Money >= Quantity * 2
 
-Effect:
-Overnight rule applied. Day += 1. Turn Complete (PRD-005 §11).
+Action Set Price
 
-## Input mapping
+Intent:
+set price
+change price
+price
 
-<!-- PRD-008 §10: "player may enter free text, Runtime must map to a valid
-     Action or reject." -->
+Parameters:
+Price: Integer
 
-Runtime should accept common phrasings ("sell", "open shop", "start")
-as Start Selling; ("buy 20 lemons") as Buy Lemons with quantity=20;
-and so on. Any input that cannot be mapped is rejected in Validation
-(PRD-005 §5).
+Preconditions:
+Price >= 0
+
+Action Start Selling
+
+Intent:
+start selling
+open shop
+sell
+open
+
+Preconditions:
+Price >= 0
+
+Auto Action End Day
+
+<!-- PRD-012 §10 Auto Action — Runtime emits automatically when the
+     Simulation Phase for the day completes. -->
+
+Fires When:
+Customers = 0 OR Lemons < 1 OR Sugar < 1 OR Ice < IcePerCup

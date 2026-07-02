@@ -1,12 +1,15 @@
 @section events
 
-<!-- PRD-008 §9 Events + PRD-005 v1.1 §7 Pre Event / §7a Post Event. -->
+<!-- PRD-008 §9 Events + PRD-008 §15a.5 Section Schema +
+     PRD-005 v1.1 §7 Pre Event / §7a Post Event. -->
 
-## Pre Events (§7)
+## Pre Events
 
-Environmental setup — resolves before Simulation, cannot commit.
+<!-- §15a.5 — every event carries Phase, Trigger, Effect. -->
 
-### Weather roll
+Event Weather Roll
+
+Phase: Pre
 
 Trigger:
 Start of Day.
@@ -14,15 +17,19 @@ Start of Day.
 Effect:
 Weather := Weighted(Sunny: 60, Rainy: 30, Heat Wave: 10)
 
-### Rain
+Event Rain
+
+Phase: Pre
 
 Trigger:
 Weather = Rainy
 
 Effect:
-BaseDemand is halved via WeatherModifier (see rules.md).
+TodayTemperature := Cool
 
-### Heat Wave
+Event Heat Wave
+
+Phase: Pre
 
 Trigger:
 Weather = Heat Wave
@@ -33,36 +40,38 @@ IcePerCup := 2
 <!-- PRD-005 §7: Heat Wave fires in Pre Event Phase so IcePerCup is
      set BEFORE Simulation reads the recipe. Resolves GAP-004. -->
 
-### Supply Shortage
+Event Supply Shortage
+
+Phase: Pre
 
 Trigger:
-Random, ~15% chance at start of any day after Day 5.
+Day >= 5 AND Uniform(1, 100) <= 15
 
 Effect:
-Lemon unit cost doubles for that day only (a Rule reads the current
-LemonPrice hidden variable).
+SupplyShortageChance := 1
 
-## Post Events (§7a)
+## Post Events
 
-Consequences — resolve after Simulation, before Commit.
+<!-- Consequences — resolve after Simulation, before Commit. -->
 
-### Festival
+Event Festival
+
+Phase: Post
 
 Trigger:
-Weighted by FestivalChance, evaluated after Simulation on days when
-Customers > 0.
+Customers = 0 AND Reputation >= 40
 
 Effect:
-Reputation += Clamp(5, 0, 100 - Reputation) if the stand sold out.
+Reputation += Clamp(5, 0, 100 - Reputation)
 
 ## Event ordering
 
 <!-- PRD-005 v1.1 §15 Event Queue — Pre and Post use distinct queues. -->
 
-Within a day:
+Within a day the queues run in this fixed order:
 
 Pre Event Queue:
-1. Weather roll
+1. Weather Roll
 2. Rain / Heat Wave effect (whichever matches)
 3. Supply Shortage check
 

@@ -162,6 +162,36 @@ export const vi: Messages = {
         suggestion:
           "Sửa `runtime` trong mgr.config.json thành mục tiêu tương thích (ví dụ `{actualMajor}.x`), hoặc cài đặt compiler khớp với package.",
       },
+      SECTION_SCHEMA_MISSING_BLOCK: {
+        message:
+          "{kind} \"{name}\" thiếu block bắt buộc \"{block}\"",
+        suggestion:
+          "Thêm block `{block}:` bên dưới `{kind} {name}`. Xem PRD-008 §15a.",
+      },
+      SECTION_SCHEMA_FORBIDDEN_BLOCK: {
+        message:
+          "{kind} \"{name}\" (Kind: {subKind}) không được khai báo block \"{block}\"",
+        suggestion:
+          "Xoá `{block}:` khỏi declaration, hoặc đổi Kind. Xem PRD-008 §15a.4.",
+      },
+      SECTION_SCHEMA_UNKNOWN_BLOCK: {
+        message:
+          "Block không nhận diện: \"{block}\" trong {kind} \"{name}\"",
+        suggestion:
+          "Tên block phải nằm trong PRD-008 §15a. Kiểm tra chính tả, hoặc chuyển nội dung vào `Behaviour:`.",
+      },
+      SECTION_SCHEMA_DUPLICATE_BLOCK: {
+        message:
+          "Block \"{block}\" khai báo hai lần trong {kind} \"{name}\"",
+        suggestion:
+          "Gộp hai block `{block}:` lại. Mỗi block chỉ được khai báo một lần.",
+      },
+      SECTION_SCHEMA_MISSING_KIND: {
+        message:
+          "{kind} \"{name}\" thiếu block `Kind:` bắt buộc",
+        suggestion:
+          "Khai báo `Kind:` rõ ràng (Guard | Transformation | Trigger cho Rule, Persistent | Transient cho Entity). Xem PRD-008 §15a.",
+      },
       INTERNAL: {
         message: "Lỗi nội bộ của compiler",
         suggestion: "Vui lòng báo cáo kèm theo nguồn gây lỗi.",

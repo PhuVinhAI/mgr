@@ -136,6 +136,46 @@ describe("directive registry (PRD-002 §14)", () => {
       expect(RESERVED_DIRECTIVES.has(name)).toBe(true);
     }
   });
+
+  it("reserves directive names claimed by PRD-008 §15a and PRD-011/012/013", () => {
+    for (const name of [
+      // PRD-008 §15a shared block names
+      "kind",
+      "attributes",
+      "behaviour",
+      "relationships",
+      "phase",
+      "lifetime",
+      "type",
+      "default",
+      "domain",
+      // PRD-012 Action Resolution
+      "action",
+      "intent",
+      "parameters",
+      "auto-action",
+      "reserved-intent",
+      "passthrough",
+      // PRD-013 Query & Selector
+      "query",
+      "where",
+      "select",
+      "order-by",
+      "limit",
+      "first",
+      "last",
+      "any",
+      "all",
+      "none",
+      // PRD-011 Rule Execution Model
+      "atomic",
+      "rollback",
+      "conflict-policy",
+      "snapshot",
+    ]) {
+      expect(RESERVED_DIRECTIVES.has(name)).toBe(true);
+    }
+  });
 });
 
 describe("parser rejects reserved directives (PRD-002 §11)", () => {

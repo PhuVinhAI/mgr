@@ -19,7 +19,7 @@
  */
 
 /** Bumped when a Runtime Layer body changes shape or wording. */
-export const RUNTIME_SPEC_VERSION = "1.4";
+export const RUNTIME_SPEC_VERSION = "1.5";
 
 export interface RuntimeSectionDef {
   /** Canonical section id (matches PSF §11). */
@@ -82,8 +82,11 @@ seven phases:
    internal Event) and normalize it into an action object.
 2. Validation Phase — check that the action exists, its preconditions
    hold, resources are sufficient, the rules permit it, and the state
-   is well-formed. On failure, end the lifecycle now; the state does
-   not change.
+   is well-formed. Guard rules run here and may reject the action.
+   Player input is resolved into a structured action with parameters
+   through intent matching before validation begins; reserved intents
+   (help, quit, retry) always win over game actions. On failure, end
+   the lifecycle now; the state does not change.
 3. Pre Event Phase — drain the pre-event queue before Simulation.
    Pre events prepare the turn's environment: weather rolls, hidden
    variables, scheduled events that must resolve before the player's
@@ -108,6 +111,16 @@ seven phases:
 Rule resolution order when several rules apply:
 System Rule → Runtime Rule → Game Rule → Event Rule. Never resolve
 rule conflicts at random.
+
+Rule execution within a phase.
+Each rule applies as a unit. Effects read the phase's start snapshot,
+never a value another rule has just written. A rule that violates a
+state invariant is discarded whole; other rules in the same phase
+still apply. When several rules touch the same variable in the same
+phase, they resolve by Priority (higher runs first): additive
+mutations sum, multiplicative mutations compose, and assignments
+require an explicit Priority winner. Same-variable assignments at
+equal Priority are a build error, not a runtime coin flip.
 
 Lifecycle invariants that hold on every turn:
 - Input is read exactly once.
@@ -414,6 +427,15 @@ Derived state.
 Some values can be computed from other state (net worth, average
 salary, combat power). Do not store derived values that can be
 recomputed. Compute them on demand.
+
+Queries and selectors.
+Rules and formulas may query collections through pure selectors:
+\`Collection where Predicate\`, \`Sum(Collection, Property)\`, \`Any(...)\`,
+\`First(... order by ...)\`. Selectors read state; they never mutate
+it. A selector reads the same snapshot the surrounding rule reads —
+never a partially-committed value. When a selector's collection is
+empty, the caller must handle the empty result explicitly; the
+runtime never picks a default.
 
 State history.
 State history follows turns: turn 1 → turn 2 → turn 3 → turn 4.
