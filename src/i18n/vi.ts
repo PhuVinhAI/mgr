@@ -53,7 +53,7 @@ export const vi: Messages = {
     skipped: "bỏ qua",
     done: "Đã khởi tạo project.",
     nextSteps: "Bước tiếp theo:",
-    nextBuild: "  mgr build     # biên dịch ra dist/game.md",
+    nextBuild: "  mgr build     # biên dịch ra dist/<tên>-<phiên bản>.md",
     nextValidate: "  mgr validate  # kiểm tra project mà không ghi output",
   },
   build: {

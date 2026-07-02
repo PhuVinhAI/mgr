@@ -23,7 +23,11 @@ export const MgrConfigSchema = z.object({
   entry: z.string().default("main.md"),
   srcDir: z.string().default("src"),
   outDir: z.string().default("dist"),
-  out: z.string().default("game.md"),
+  // Output filename. When omitted, the pipeline derives it from
+  // `name` + `version` via `resolveOutFilename` — a `hangman@0.1.0`
+  // project builds to `dist/hangman-0.1.0.md`, not the ambiguous
+  // `dist/game.md`. Set this explicitly to override.
+  out: z.string().optional(),
   // PRD-008 §4 — Game Package Metadata.
   author: z.string().optional(),
   description: z.string().optional(),
@@ -42,6 +46,29 @@ export const DEFAULT_CONFIG: MgrConfig = MgrConfigSchema.parse({});
 
 export function parseConfig(raw: unknown): MgrConfig {
   return MgrConfigSchema.parse(raw);
+}
+
+/**
+ * Resolve the output filename for a config. When `out` is set, it is
+ * used verbatim. When `out` is unset, the filename derives from
+ * `name` + `version` so that the built spec carries its project
+ * identity in the filesystem — `hangman@0.1.0` → `hangman-0.1.0.md`.
+ *
+ * Sanitization strips path separators and control characters so a
+ * config value like `"foo/bar"` cannot escape `outDir`.
+ */
+export function resolveOutFilename(config: MgrConfig): string {
+  if (config.out && config.out.length > 0) return config.out;
+  const stem = sanitizeFilenamePart(config.name) || "game";
+  const ver = sanitizeFilenamePart(config.version);
+  return ver ? `${stem}-${ver}.md` : `${stem}.md`;
+}
+
+function sanitizeFilenamePart(raw: string): string {
+  return raw
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, "-")
+    .replace(/^[.\-]+/, "")
+    .trim();
 }
 
 /**

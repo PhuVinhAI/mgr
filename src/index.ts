@@ -24,6 +24,7 @@ export {
   DEFAULT_CONFIG,
   MgrConfigSchema,
   isRuntimeCompatible,
+  resolveOutFilename,
   type MgrConfig,
 } from "./config/index.js";
 

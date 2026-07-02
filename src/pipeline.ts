@@ -10,6 +10,7 @@ import {
   DEFAULT_CONFIG,
   parseConfig,
   isRuntimeCompatible,
+  resolveOutFilename,
   type MgrConfig,
 } from "./config/index.js";
 import { buildGraph, type ProjectGraph } from "./graph/index.js";
@@ -158,7 +159,7 @@ export async function compile(
   logger.stepSuccess("optimize");
 
   // 6. Write.
-  const outputPath = path.join(root, config.outDir, config.out);
+  const outputPath = path.join(root, config.outDir, resolveOutFilename(config));
   if (options.write !== false) {
     logger.stepStart("write", path.relative(root, outputPath));
     try {

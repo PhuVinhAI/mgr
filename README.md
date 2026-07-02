@@ -19,13 +19,13 @@ node ../dist/cli/index.js init
 node ../dist/cli/index.js build
 ```
 
-`dist/game.md` is the single Prompt Specification produced from your Markdown sources.
+`dist/<name>-<version>.md` is the single Prompt Specification produced from your Markdown sources — a `hello-mgr@0.1.0` project builds to `dist/hello-mgr-0.1.0.md`. Set `out` in `mgr.config.json` to override.
 
 ## CLI
 
 ```
 mgr init       # Create a new project from the built-in template
-mgr build      # Compile into dist/game.md
+mgr build      # Compile into dist/<name>-<version>.md
 mgr validate   # Validate without producing output
 mgr doctor     # Report environment and project health
 ```
@@ -47,12 +47,14 @@ project/
 ```json
 {
   "name": "hello-mgr",
+  "version": "0.1.0",
   "entry": "main.md",
   "srcDir": "src",
-  "outDir": "dist",
-  "out": "game.md"
+  "outDir": "dist"
 }
 ```
+
+`out` is optional; when omitted the pipeline writes `dist/<name>-<version>.md`.
 
 ## Directives (PRD §10)
 

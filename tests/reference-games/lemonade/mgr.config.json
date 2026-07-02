@@ -3,6 +3,5 @@
   "version": "0.1.0",
   "entry": "main.md",
   "srcDir": "src",
-  "outDir": "dist",
-  "out": "game.md"
+  "outDir": "dist"
 }

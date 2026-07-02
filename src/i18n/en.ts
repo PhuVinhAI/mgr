@@ -53,7 +53,7 @@ export const en: Messages = {
     skipped: "skipped",
     done: "Project initialized.",
     nextSteps: "Next steps:",
-    nextBuild: "  mgr build     # compile into dist/game.md",
+    nextBuild: "  mgr build     # compile into dist/<name>-<version>.md",
     nextValidate: "  mgr validate  # check project without writing output",
   },
   build: {

@@ -99,4 +99,51 @@ describe("pipeline", () => {
       code: "DEPENDENCY_CYCLE",
     });
   });
+
+  it("defaults output filename to <name>-<version>.md when `out` is unset", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({
+        name: "hangman",
+        version: "0.1.0",
+        entry: "main.md",
+      }),
+      "src/main.md": "@section system\n\nS\n",
+    });
+    const result = await compile({ root, buildDate: new Date(0) });
+    expect(path.basename(result.outputPath)).toBe("hangman-0.1.0.md");
+    // The file physically exists at the derived path.
+    const written = await readFile(result.outputPath, "utf8");
+    expect(written).toContain("# hangman");
+  });
+
+  it("honors explicit `out` in config over the derived default", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({
+        name: "hangman",
+        version: "0.1.0",
+        entry: "main.md",
+        out: "spec.md",
+      }),
+      "src/main.md": "@section system\n\nS\n",
+    });
+    const result = await compile({ root, buildDate: new Date(0) });
+    expect(path.basename(result.outputPath)).toBe("spec.md");
+  });
+
+  it("sanitizes name and version so they cannot escape outDir", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({
+        // Path separators + control chars in name; version with a slash.
+        name: "../evil/name",
+        version: "1.0/0",
+        entry: "main.md",
+      }),
+      "src/main.md": "@section system\n\nS\n",
+    });
+    const result = await compile({ root, buildDate: new Date(0) });
+    const base = path.basename(result.outputPath);
+    expect(base).not.toContain("/");
+    expect(base).not.toContain("\\");
+    expect(base).toBe("evil-name-1.0-0.md");
+  });
 });
