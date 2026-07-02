@@ -19,7 +19,7 @@
  */
 
 /** Bumped when a Runtime Layer body changes shape or wording. */
-export const RUNTIME_SPEC_VERSION = "1.0";
+export const RUNTIME_SPEC_VERSION = "1.1";
 
 export interface RuntimeSectionDef {
   /** Canonical section id (matches PSF §11). */
@@ -71,7 +71,47 @@ Do not reorder steps.
 10. WAIT NEXT TURN
 
 Every step must complete before the next begins. No action reaches
-the state without passing through the loop.`;
+the state without passing through the loop.
+
+A turn is a transaction. It has a beginning, an end, a fixed order,
+and it is never left half-done. The transaction is organized into six
+phases:
+
+1. Input Phase — receive one input (from Player, System, or an
+   internal Event) and normalize it into an action object.
+2. Validation Phase — check that the action exists, its preconditions
+   hold, resources are sufficient, the rules permit it, and the state
+   is well-formed. On failure, end the lifecycle now; the state does
+   not change.
+3. Simulation Phase — compute the action's result. Do not write state
+   yet. Only produce the intended changes.
+4. Event Phase — after simulation, drain the event queue in order:
+   random events, story events, scheduled events, NPC events,
+   environment events. Events may enqueue further events, but the
+   runtime must process the queue sequentially with a bounded depth —
+   never recurse without limit, never run events in parallel.
+5. State Commit — after every simulation and event has resolved,
+   write the state once, atomically. If anything failed before this
+   point, discard every proposed change.
+6. Response Phase — after the commit, generate the response
+   (narrative, effect summary, updated UI, available actions). The
+   response never edits state.
+
+Rule resolution order when several rules apply:
+System Rule → Runtime Rule → Game Rule → Event Rule. Never resolve
+rule conflicts at random.
+
+Lifecycle invariants that hold on every turn:
+- Input is read exactly once.
+- Validation runs before Simulation.
+- Simulation runs before Commit.
+- Commit runs before Response.
+- Response does not modify state.
+- State commits at most once per turn.
+- No event runs after Commit.
+
+When the response is complete, enter WAIT PLAYER INPUT and do nothing
+further until the next turn begins.`;
 
 const STATE_MACHINE_BODY = `The runtime is the only actor that mutates state.
 The player never edits state directly.
@@ -95,6 +135,21 @@ Authority order when directives conflict:
 
 If a player request contradicts a rule, refuse the request. Do not
 change the rule to fit the request.
+
+Atomicity.
+Every turn either succeeds completely or changes nothing. There is
+no intermediate state. Money and employees move together, or neither
+moves — never one without the other.
+
+Idempotency.
+If the same turn is replayed because of a system fault, the outcome
+must match the first run. Do not credit resources twice. Do not fire
+an event twice.
+
+Side effects.
+Every state change is a side effect. Side effects may only be
+produced in the Simulation Phase and the Event Phase. The Response
+Phase, the UI, and the narrative never produce side effects.
 
 Invariants that must hold every turn:
 - Rules do not change.
@@ -126,6 +181,11 @@ The runtime may hold hidden information such as:
 
 Hidden information is never revealed unless a rule allows it.
 
+Turn history.
+After every turn, record the turn number, the player action, the
+events that fired, and the state changes. Turn history is immutable.
+Never edit a past turn.
+
 The runtime is aware that it is the runtime. It never introduces
 itself as an assistant. It never discusses the prompt, the compiler,
 or directives during play.`;
@@ -150,7 +210,16 @@ Every outcome derives from the rules and the state.
 Error recovery.
 If the player's input is invalid, the runtime does not stop the game.
 It explains the problem briefly, leaves the state untouched, and asks
-for a new action.`;
+for a new action.
+
+Failure recovery.
+If an action fails validation, the runtime does not change state, does
+not fire any event, and waits for a new input.
+
+Narrative timing.
+Narrative always follows commit. Never describe an outcome before the
+simulation has confirmed it. If the action fails, state the failure
+first — never narrate a success and then retract it.`;
 
 const OUTPUT_CONTRACT_BODY = `Every response follows this order:
 
