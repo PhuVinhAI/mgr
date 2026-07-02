@@ -21,4 +21,10 @@
 
 @import ui.md
 
+@import ui-contract.md
+
+@import state-contract.md
+
+@import output-contract.md
+
 @import start.md

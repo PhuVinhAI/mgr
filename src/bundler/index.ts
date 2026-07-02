@@ -37,6 +37,10 @@ import {
   RUNTIME_SECTIONS,
   RUNTIME_SPEC_VERSION,
 } from "../runtime/index.js";
+import {
+  CONTRACT_SECTIONS,
+  CONTRACT_SPEC_VERSION,
+} from "../contracts/index.js";
 
 export interface BundleMetadata {
   /** Project name (from mgr.config.json). */
@@ -110,18 +114,27 @@ export function bundle(input: BundleInput): BundleResult {
   }
   canonical.sort((a, b) => psfSectionRank(a.id) - psfSectionRank(b.id));
 
-  // 2b. Inject Runtime Layer defaults (PRD-004). MGR ships canonical
-  //     bodies for `runtime`, `turn-loop`, `state-machine`,
-  //     `memory-model`, `validation`, and `output-contract` so every
-  //     game shares the same base behavior. Author-provided sections
-  //     with the same id win — the user's `@section runtime` overrides
-  //     the default and no synthesized copy is added.
+  // 2b. Inject Runtime Layer defaults (PRD-004) and Contract Layer
+  //     defaults (PRD-006, PRD-007). MGR ships canonical bodies for
+  //     the five runtime sections (runtime, turn-loop, state-machine,
+  //     memory-model, validation) and the three contract sections
+  //     (ui-contract, state-contract, output-contract) so every game
+  //     starts with a complete specification. Author-provided sections
+  //     with the same id win — the user's `@section ui-contract`
+  //     overrides the default and no synthesized copy is added. The
+  //     boundary is deliberate: runtime bodies encode behavior every
+  //     MGR game shares (PRD-004 §17); contract bodies encode
+  //     presentation choices a genre may want to override.
   const authored = new Set(
     canonical.map((s) => canonicalizeSectionId(s.id)),
   );
   for (const rt of RUNTIME_SECTIONS) {
     if (authored.has(rt.id)) continue;
     canonical.push(synthesizeSection(rt.id, rt.body));
+  }
+  for (const ct of CONTRACT_SECTIONS) {
+    if (authored.has(ct.id)) continue;
+    canonical.push(synthesizeSection(ct.id, ct.body));
   }
   canonical.sort((a, b) => psfSectionRank(a.id) - psfSectionRank(b.id));
 
@@ -174,6 +187,7 @@ function renderMetadata(m: BundleMetadata): string {
   lines.push(`- Compiler Version: ${m.compilerVersion}`);
   lines.push(`- Specification Version: ${PSF_SPEC_VERSION}`);
   lines.push(`- Runtime Spec Version: ${RUNTIME_SPEC_VERSION}`);
+  lines.push(`- Contract Spec Version: ${CONTRACT_SPEC_VERSION}`);
   return lines.join("\n");
 }
 

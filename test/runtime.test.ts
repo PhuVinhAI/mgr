@@ -9,6 +9,12 @@ import {
   isRuntimeSection,
   runtimeSectionBody,
 } from "../src/runtime/index.js";
+import {
+  CONTRACT_SECTIONS,
+  CONTRACT_SPEC_VERSION,
+  isContractSection,
+  contractSectionBody,
+} from "../src/contracts/index.js";
 
 async function makeProject(files: Record<string, string>): Promise<string> {
   const root = await mkdtemp(path.join(tmpdir(), "mgr-test-"));
@@ -22,6 +28,10 @@ async function makeProject(files: Record<string, string>): Promise<string> {
 
 describe("runtime catalog (PRD-004)", () => {
   it("ships canonical bodies for every Runtime Layer id", () => {
+    // PRD-004 §18: UI, State Schema, and the response envelope are
+    // NON-goals of the Runtime Specification. Only behavior sections
+    // live in the runtime catalog; the presentation contracts moved
+    // to src/contracts/ (see contracts.test.ts).
     const ids = RUNTIME_SECTIONS.map((s) => s.id);
     expect(ids).toEqual([
       "runtime",
@@ -29,9 +39,6 @@ describe("runtime catalog (PRD-004)", () => {
       "state-machine",
       "memory-model",
       "validation",
-      "ui-contract",
-      "state-contract",
-      "output-contract",
     ]);
   });
 
@@ -42,6 +49,29 @@ describe("runtime catalog (PRD-004)", () => {
     expect(isRuntimeSection("nonsense")).toBe(false);
     expect(runtimeSectionBody("turn-loop")).toContain("LOAD SPECIFICATION");
     expect(runtimeSectionBody("game")).toBeUndefined();
+  });
+
+  it("keeps runtime and contract layers disjoint", () => {
+    // The design split lives here: presentation section ids must NOT
+    // resolve through the runtime catalog, and runtime section ids
+    // must NOT resolve through the contract catalog. If someone moves
+    // a section without updating the other module, this test breaks.
+    for (const id of ["ui-contract", "state-contract", "output-contract"]) {
+      expect(isRuntimeSection(id)).toBe(false);
+      expect(runtimeSectionBody(id)).toBeUndefined();
+      expect(isContractSection(id)).toBe(true);
+      expect(contractSectionBody(id)).toBeDefined();
+    }
+    for (const id of [
+      "runtime",
+      "turn-loop",
+      "state-machine",
+      "memory-model",
+      "validation",
+    ]) {
+      expect(isContractSection(id)).toBe(false);
+      expect(contractSectionBody(id)).toBeUndefined();
+    }
   });
 });
 
@@ -197,8 +227,13 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
     expect(result.output).toContain(
       `- Runtime Spec Version: ${RUNTIME_SPEC_VERSION}`,
     );
-    // Version tracks the shape of the bodies. PRD-014 bumped it to 1.6.
-    expect(RUNTIME_SPEC_VERSION).toBe("1.6");
+    expect(result.output).toContain(
+      `- Contract Spec Version: ${CONTRACT_SPEC_VERSION}`,
+    );
+    // Version tracks the shape of the bodies. Bumped to 2.0 when the
+    // UI/State/Output contracts moved out of the runtime module.
+    expect(RUNTIME_SPEC_VERSION).toBe("2.0");
+    expect(CONTRACT_SPEC_VERSION).toBe("1.0");
   });
 
   it("stays deterministic across two builds with the same source", async () => {
@@ -321,7 +356,8 @@ describe("state system content (PRD-006)", () => {
       "src/main.md": "@section system\n\nS\n",
     });
     const result = await compile({ root, buildDate: new Date(0) });
-    const sc = runtimeSectionBody("state-contract") ?? "";
+    // state-contract now lives in the contracts catalog, not runtime.
+    const sc = contractSectionBody("state-contract") ?? "";
 
     // §5–§10 building blocks are all mentioned by name.
     for (const kind of [
@@ -415,7 +451,7 @@ describe("ui contract content (PRD-007)", () => {
       "src/main.md": "@section system\n\nS\n",
     });
     const result = await compile({ root, buildDate: new Date(0) });
-    const ui = runtimeSectionBody("ui-contract") ?? "";
+    const ui = contractSectionBody("ui-contract") ?? "";
 
     // §4 — the 7 layout slots by name.
     expect(ui).toMatch(/1\. Narrative/);
@@ -435,7 +471,7 @@ describe("ui contract content (PRD-007)", () => {
   });
 
   it("ui-contract body forbids HTML and CSS, allows standard Markdown", async () => {
-    const ui = runtimeSectionBody("ui-contract") ?? "";
+    const ui = contractSectionBody("ui-contract") ?? "";
     // §12 allowlist + prohibitions.
     expect(ui).toContain("Do not use HTML.");
     expect(ui).toMatch(/Do not\s+depend on CSS\./);
@@ -454,7 +490,7 @@ describe("ui contract content (PRD-007)", () => {
   });
 
   it("ui-contract body masks hidden state and preserves layout on error", async () => {
-    const ui = runtimeSectionBody("ui-contract") ?? "";
+    const ui = contractSectionBody("ui-contract") ?? "";
     // §15 hidden info masking symbols.
     expect(ui).toContain("`???`");
     expect(ui).toContain("`Unknown`");
@@ -464,7 +500,7 @@ describe("ui contract content (PRD-007)", () => {
   });
 
   it("ui-contract body lists the seven UI invariants", async () => {
-    const ui = runtimeSectionBody("ui-contract") ?? "";
+    const ui = contractSectionBody("ui-contract") ?? "";
     // §19 invariants.
     for (const line of [
       "- Narrative is present.",

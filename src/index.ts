@@ -89,6 +89,14 @@ export {
   type RuntimeSectionDef,
 } from "./runtime/index.js";
 
+export {
+  CONTRACT_SECTIONS,
+  CONTRACT_SPEC_VERSION,
+  isContractSection,
+  contractSectionBody,
+  type ContractSectionDef,
+} from "./contracts/index.js";
+
 export { COMPILER_VERSION } from "./version.js";
 
 export { optimize, type OptimizeResult } from "./optimizer/index.js";
