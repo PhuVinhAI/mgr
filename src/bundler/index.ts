@@ -33,6 +33,10 @@ import {
   psfSectionTitle,
   canonicalizeSectionId,
 } from "../psf/index.js";
+import {
+  RUNTIME_SECTIONS,
+  RUNTIME_SPEC_VERSION,
+} from "../runtime/index.js";
 
 export interface BundleMetadata {
   /** Project name (from mgr.config.json). */
@@ -99,6 +103,22 @@ export function bundle(input: BundleInput): BundleResult {
     else custom.push(s);
   }
   canonical.sort((a, b) => psfSectionRank(a.id) - psfSectionRank(b.id));
+
+  // 2b. Inject Runtime Layer defaults (PRD-004). MGR ships canonical
+  //     bodies for `runtime`, `turn-loop`, `state-machine`,
+  //     `memory-model`, `validation`, and `output-contract` so every
+  //     game shares the same base behavior. Author-provided sections
+  //     with the same id win — the user's `@section runtime` overrides
+  //     the default and no synthesized copy is added.
+  const authored = new Set(
+    canonical.map((s) => canonicalizeSectionId(s.id)),
+  );
+  for (const rt of RUNTIME_SECTIONS) {
+    if (authored.has(rt.id)) continue;
+    canonical.push(synthesizeSection(rt.id, rt.body));
+  }
+  canonical.sort((a, b) => psfSectionRank(a.id) - psfSectionRank(b.id));
+
   const orderedSections: SectionNode[] = [...canonical, ...custom];
 
   // 3. Compose the envelope.
@@ -144,6 +164,7 @@ function renderMetadata(m: BundleMetadata): string {
   lines.push(`- Build Date: ${m.buildDate}`);
   lines.push(`- Compiler Version: ${m.compilerVersion}`);
   lines.push(`- Specification Version: ${PSF_SPEC_VERSION}`);
+  lines.push(`- Runtime Spec Version: ${RUNTIME_SPEC_VERSION}`);
   return lines.join("\n");
 }
 
@@ -194,4 +215,25 @@ function renderInlineBlock(block: BlockNode): string {
 // Re-exported for callers who want to inspect the individual documents.
 export function documentSectionIds(doc: MgrDocument): string[] {
   return doc.sections.map((s) => canonicalizeSectionId(s.id));
+}
+
+/**
+ * Build a SectionNode from a canonical body string. Used to inject the
+ * Runtime Layer defaults (PRD-004) when the author did not provide an
+ * `@section` for one of the reserved runtime ids.
+ */
+function synthesizeSection(id: string, body: string): SectionNode {
+  const loc = { line: 0, column: 0 };
+  return {
+    type: "section",
+    id,
+    location: loc,
+    body: [
+      {
+        type: "markdown",
+        value: body,
+        location: loc,
+      },
+    ],
+  };
 }

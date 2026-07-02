@@ -80,6 +80,14 @@ export {
   type PsfSectionDef,
 } from "./psf/index.js";
 
+export {
+  RUNTIME_SECTIONS,
+  RUNTIME_SPEC_VERSION,
+  isRuntimeSection,
+  runtimeSectionBody,
+  type RuntimeSectionDef,
+} from "./runtime/index.js";
+
 export { COMPILER_VERSION } from "./version.js";
 
 export { optimize, type OptimizeResult } from "./optimizer/index.js";
