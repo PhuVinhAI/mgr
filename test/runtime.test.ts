@@ -29,6 +29,7 @@ describe("runtime catalog (PRD-004)", () => {
       "state-machine",
       "memory-model",
       "validation",
+      "ui-contract",
       "state-contract",
       "output-contract",
     ]);
@@ -69,6 +70,7 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
     expect(result.output).toMatch(/^---\n\n# STATE MACHINE$/m);
     expect(result.output).toMatch(/^---\n\n# MEMORY MODEL$/m);
     expect(result.output).toMatch(/^---\n\n# VALIDATION$/m);
+    expect(result.output).toMatch(/^---\n\n# UI CONTRACT$/m);
     expect(result.output).toMatch(/^---\n\n# STATE CONTRACT$/m);
     expect(result.output).toMatch(/^---\n\n# OUTPUT CONTRACT$/m);
 
@@ -89,7 +91,7 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
     expect(result.output).toMatch(/5\. Await Player Input/);
 
     // Bundle result reports the injected sections in canonical order.
-    // PSF §11 places state-contract after ui-contract, before game.
+    // PSF §11 places ui-contract before state-contract, then output-contract.
     expect(result.bundle.sectionOrder).toEqual([
       "system",
       "runtime",
@@ -97,6 +99,7 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
       "state-machine",
       "memory-model",
       "validation",
+      "ui-contract",
       "state-contract",
       "output-contract",
     ]);
@@ -128,7 +131,8 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
     expect(at("STATE MACHINE")).toBeGreaterThan(at("TURN LOOP"));
     expect(at("MEMORY MODEL")).toBeGreaterThan(at("STATE MACHINE"));
     expect(at("VALIDATION")).toBeGreaterThan(at("MEMORY MODEL"));
-    expect(at("STATE CONTRACT")).toBeGreaterThan(at("VALIDATION"));
+    expect(at("UI CONTRACT")).toBeGreaterThan(at("VALIDATION"));
+    expect(at("STATE CONTRACT")).toBeGreaterThan(at("UI CONTRACT"));
     expect(at("OUTPUT CONTRACT")).toBeGreaterThan(at("STATE CONTRACT"));
     expect(at("FIRST TURN")).toBeGreaterThan(at("OUTPUT CONTRACT"));
   });
@@ -178,8 +182,8 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
     expect(result.output).toContain(
       `- Runtime Spec Version: ${RUNTIME_SPEC_VERSION}`,
     );
-    // Version tracks the shape of the bodies. PRD-006 bumped it to 1.2.
-    expect(RUNTIME_SPEC_VERSION).toBe("1.2");
+    // Version tracks the shape of the bodies. PRD-007 bumped it to 1.3.
+    expect(RUNTIME_SPEC_VERSION).toBe("1.3");
   });
 
   it("stays deterministic across two builds with the same source", async () => {
@@ -366,5 +370,102 @@ describe("state system content (PRD-006)", () => {
     // The canonical serialization clause must NOT appear when the
     // author has overridden the section.
     expect(result.output).not.toContain("never rely on JSON");
+  });
+});
+
+describe("ui contract content (PRD-007)", () => {
+  let root: string;
+  afterEach(async () => {
+    if (root) await rm(root, { recursive: true, force: true });
+  });
+
+  it("ui-contract body encodes the 7-part layout in order", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({ name: "ui", entry: "main.md" }),
+      "src/main.md": "@section system\n\nS\n",
+    });
+    const result = await compile({ root, buildDate: new Date(0) });
+    const ui = runtimeSectionBody("ui-contract") ?? "";
+
+    // §4 — the 7 layout slots by name.
+    expect(ui).toMatch(/1\. Narrative/);
+    expect(ui).toMatch(/2\. Events/);
+    expect(ui).toMatch(/3\. Dashboard/);
+    expect(ui).toMatch(/4\. Details/);
+    expect(ui).toMatch(/5\. Available Actions/);
+    expect(ui).toMatch(/6\. Prompt/);
+    expect(ui).toMatch(/7\. State Snapshot/);
+
+    // Ordering constraint holds in the rendered bundle too.
+    const at = (needle: string): number => result.output.indexOf(needle);
+    expect(at("1. Narrative")).toBeGreaterThan(0);
+    expect(at("2. Events")).toBeGreaterThan(at("1. Narrative"));
+    expect(at("3. Dashboard")).toBeGreaterThan(at("2. Events"));
+    expect(at("7. State Snapshot")).toBeGreaterThan(at("6. Prompt"));
+  });
+
+  it("ui-contract body forbids HTML and CSS, allows standard Markdown", async () => {
+    const ui = runtimeSectionBody("ui-contract") ?? "";
+    // §12 allowlist + prohibitions.
+    expect(ui).toContain("Do not use HTML.");
+    expect(ui).toMatch(/Do not\s+depend on CSS\./);
+    for (const feature of [
+      "headings",
+      "tables",
+      "lists",
+      "blockquotes",
+      "bold",
+      "italic",
+      "horizontal rules",
+      "code blocks",
+    ]) {
+      expect(ui).toContain(feature);
+    }
+  });
+
+  it("ui-contract body masks hidden state and preserves layout on error", async () => {
+    const ui = runtimeSectionBody("ui-contract") ?? "";
+    // §15 hidden info masking symbols.
+    expect(ui).toContain("`???`");
+    expect(ui).toContain("`Unknown`");
+    // §16 error UI keeps everything except narrative slot.
+    expect(ui).toContain("Error UI.");
+    expect(ui).toContain("the layout does not change");
+  });
+
+  it("ui-contract body lists the seven UI invariants", async () => {
+    const ui = runtimeSectionBody("ui-contract") ?? "";
+    // §19 invariants.
+    for (const line of [
+      "- Narrative is present.",
+      "- Dashboard is present.",
+      "- Available Actions is present.",
+      "- Prompt is present.",
+      "- State Snapshot is present.",
+      "- No hidden state is rendered.",
+      "- The layout does not change.",
+    ]) {
+      expect(ui).toContain(line);
+    }
+  });
+
+  it("author-supplied ui-contract overrides the canonical body", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({
+        name: "ui-over",
+        entry: "main.md",
+      }),
+      "src/main.md": [
+        "@section ui-contract",
+        "",
+        "AUTHOR UI CONTRACT.",
+      ].join("\n"),
+    });
+    const result = await compile({ root, buildDate: new Date(0) });
+    const occurrences =
+      result.output.match(/^# UI CONTRACT$/gm)?.length ?? 0;
+    expect(occurrences).toBe(1);
+    expect(result.output).toContain("AUTHOR UI CONTRACT.");
+    expect(result.output).not.toContain("Renderer independence.");
   });
 });

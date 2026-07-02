@@ -19,7 +19,7 @@
  */
 
 /** Bumped when a Runtime Layer body changes shape or wording. */
-export const RUNTIME_SPEC_VERSION = "1.2";
+export const RUNTIME_SPEC_VERSION = "1.3";
 
 export interface RuntimeSectionDef {
   /** Canonical section id (matches PSF §11). */
@@ -241,8 +241,87 @@ const OUTPUT_CONTRACT_BODY = `Every response follows this order:
 4. Available Actions — what the player can do next.
 5. Await Player Input — hand control back to the player.
 
-The UI Contract may refine formatting within each part, but the
-ordering above is fixed.`;
+The UI Contract refines how each of these parts is rendered as
+Markdown — headings, tables, dashboards, snapshot format. The
+runtime ordering above is fixed; presentation details defer to the
+UI Contract.`;
+
+const UI_CONTRACT_BODY = `The UI is a view of the state. It carries no logic. It does not
+change state. It only reflects the current state.
+
+Every turn renders the same layout, in this fixed order:
+
+1. Narrative — what just happened.
+2. Events — named events with a short effect summary, only when the
+   turn produced any.
+3. Dashboard — the most important information for the player. Always
+   present. Its contents (money, health, energy, population, date,
+   ...) are chosen by the game package; its position never moves.
+4. Details — expanded panels (inventory, research, projects, army,
+   relationships). Shown only when relevant.
+5. Available Actions — a numbered list of actions the player can
+   take. Always present. The player is not forced to choose from the
+   list, but the runtime must always provide one.
+6. Prompt — an invitation to submit the next action. The runtime
+   never plays the next turn on its own.
+7. State Snapshot — the current state serialized per the State
+   Contract. Present on every turn to support save, load, replay, and
+   debug. The snapshot is not narrative.
+
+Narrative rules.
+- Short and to the point.
+- Consistent with the rules.
+- Never leaks hidden state.
+- Contains no UI markup.
+
+Markdown allowlist.
+Use standard Markdown only: headings, tables, lists, blockquotes,
+bold, italic, horizontal rules, code blocks. Do not use HTML. Do not
+depend on CSS. The output must render on any Markdown surface.
+
+Stable layout.
+The layout is stable across turns. Turn 1 and turn 500 place the
+dashboard in the same slot, the action menu in the same slot, the
+snapshot in the same slot.
+
+Adaptive detail.
+The runtime may show or hide detail panels as the game evolves —
+early game may render only the dashboard; late game may add a
+project panel. Only the content changes; the layout does not.
+
+Hidden information.
+Hidden state is never rendered. When a rule requires the runtime to
+acknowledge that hidden information exists, use \`???\` or
+\`Unknown\`. Never reveal the real value.
+
+Error UI.
+If an action fails, the layout does not change. The narrative slot
+carries the error explanation instead of a success story; the
+dashboard, the action menu, and the state snapshot still render.
+
+Accessibility.
+- Easy to read.
+- Clear spacing.
+- Consistent headings.
+- Simple tables.
+- No overreliance on symbols.
+- No dependency on color.
+- No dependency on emoji. Emoji is a game-package option, not a
+  contract requirement.
+
+Renderer independence.
+The UI Contract describes structure, not rendering. Do not assume a
+font, a theme, dark mode, mobile, or desktop. Markdown must work
+everywhere.
+
+UI invariants every turn:
+- Narrative is present.
+- Dashboard is present.
+- Available Actions is present.
+- Prompt is present.
+- State Snapshot is present.
+- No hidden state is rendered.
+- The layout does not change.`;
 
 const STATE_CONTRACT_BODY = `State is the single source of truth for this game. Every runtime
 decision derives from state. If a fact is not written in state or
@@ -326,13 +405,14 @@ Only the runtime may create, modify, or delete state. The player
 only submits actions. The game package only declares the schema and
 the rules.`;
 
-/** PRD-004 §4, §7, §12, §15 and PRD-006 — canonical Runtime Layer bodies. */
+/** PRD-004 §4, §7, §12, §15, PRD-006, and PRD-007 — canonical Runtime Layer bodies. */
 export const RUNTIME_SECTIONS: readonly RuntimeSectionDef[] = [
   { id: "runtime", body: RUNTIME_BODY },
   { id: "turn-loop", body: TURN_LOOP_BODY },
   { id: "state-machine", body: STATE_MACHINE_BODY },
   { id: "memory-model", body: MEMORY_MODEL_BODY },
   { id: "validation", body: VALIDATION_BODY },
+  { id: "ui-contract", body: UI_CONTRACT_BODY },
   { id: "state-contract", body: STATE_CONTRACT_BODY },
   { id: "output-contract", body: OUTPUT_CONTRACT_BODY },
 ];
