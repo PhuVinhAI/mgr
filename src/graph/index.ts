@@ -9,6 +9,7 @@ import { stat } from "node:fs/promises";
 import * as path from "node:path";
 import { MgrError } from "../errors/index.js";
 import { parseFile } from "../parser/index.js";
+import type { DirectiveRegistry } from "../parser/directives.js";
 import type { MgrDocument, DirectiveNode } from "../parser/ast.js";
 
 export interface ProjectGraph {
@@ -32,6 +33,8 @@ export interface BuildGraphInput {
   srcDir: string;
   /** Entry file, relative to srcDir. */
   entry: string;
+  /** Optional directive registry (PRD-002 §14). */
+  registry?: DirectiveRegistry;
 }
 
 export async function buildGraph(
@@ -55,12 +58,18 @@ export async function buildGraph(
     const { abs, rel } = queue.shift()!;
     if (documents.has(rel)) continue;
 
-    const doc = await parseFile(abs, rel);
+    const doc = await parseFile(abs, rel, input.registry);
     documents.set(rel, doc);
 
     const importRels: string[] = [];
+    // PRD-002 §8: a file that imports the same target twice is
+    // silently deduplicated. Cycles are still surfaced downstream by
+    // topologicalOrder().
+    const seen = new Set<string>();
     for (const imp of doc.imports) {
       const targetRel = await resolveImport(srcDir, rel, imp);
+      if (seen.has(targetRel)) continue;
+      seen.add(targetRel);
       importRels.push(targetRel);
       const targetAbs = path.join(srcDir, targetRel);
       if (!documents.has(targetRel)) {

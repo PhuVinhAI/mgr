@@ -24,6 +24,7 @@ export interface ErrorCatalog {
   FILE_NOT_FOUND: { message: string; suggestion: string };
   READ_FAILED: { message: string; suggestion: string };
   UNKNOWN_DIRECTIVE: { message: string; suggestion: string };
+  DIRECTIVE_RESERVED: { message: string; suggestion: string };
   DIRECTIVE_SYNTAX_SECTION_MISSING_ID: { message: string; suggestion: string };
   DIRECTIVE_SYNTAX_SECTION_INVALID_ID: { message: string; suggestion: string };
   DIRECTIVE_SYNTAX_IMPORT_MISSING_PATH: {

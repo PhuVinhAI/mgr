@@ -5,7 +5,12 @@
  * or MGR directives (@import, @section, ...).
  */
 
-export type DirectiveName = "import" | "section";
+/**
+ * Directive names are strings so the registry (PRD-002 §14) can add
+ * new directives without touching the AST. Foundation ships `import`
+ * and `section`; future PRDs may register more.
+ */
+export type DirectiveName = string;
 
 export interface SourceLocation {
   /** 1-based line number. */

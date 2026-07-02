@@ -109,6 +109,11 @@ export const en: Messages = {
         message: "Unknown directive @{name}",
         suggestion: "Did you mean @{hint} ?",
       },
+      DIRECTIVE_RESERVED: {
+        message: "Directive @{name} is reserved and cannot be used yet",
+        suggestion:
+          "This name is reserved by MGR for a future release. Choose another name, or wait for the PRD that defines it.",
+      },
       DIRECTIVE_SYNTAX_SECTION_MISSING_ID: {
         message: "@section directive requires an id",
         suggestion: "Write `@section <id>` (e.g. `@section intro`).",

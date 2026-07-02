@@ -3,18 +3,17 @@
  *
  * A directive is any line whose first non-whitespace character is `@`,
  * shaped as: `@name [arg...]`. Directives are line-level; they cannot
- * appear inline.
+ * appear inline (PRD-002 §6).
  *
- * `@section <id>` opens a section. A section ends at the next `@section`
- * directive or at EOF. This mirrors Markdown headings but is explicit.
+ * The parser is directive-agnostic: it only recognizes the shape and
+ * dispatches to a handler registered in the DirectiveRegistry
+ * (PRD-002 §14). Foundation seeds `@import` and `@section` handlers;
+ * new directives can be added without touching this file.
  *
- * `@import <path>` records a dependency on another file, relative to the
- * current file's directory (or to srcDir when starting with `/`).
- *
- * Unknown `@name` directives are surfaced as UNKNOWN_DIRECTIVE by the
- * validator — the parser records them faithfully rather than rejecting
- * them upfront, so Foundation can be extended by future PRDs without
- * touching this file.
+ * Error handling:
+ *   - Unknown directive → UNKNOWN_DIRECTIVE with "did you mean" hint.
+ *   - Reserved directive (PRD-002 §11) → DIRECTIVE_RESERVED.
+ *   - Syntax problems inside a handler → DIRECTIVE_SYNTAX.
  */
 import { readFile } from "node:fs/promises";
 import * as path from "node:path";
@@ -28,10 +27,11 @@ import type {
   MarkdownBlockNode,
   MgrDocument,
   SectionNode,
-  DirectiveName,
 } from "./ast.js";
-
-const KNOWN_DIRECTIVES: ReadonlySet<string> = new Set(["import", "section"]);
+import {
+  createFoundationRegistry,
+  DirectiveRegistry,
+} from "./directives.js";
 
 const DIRECTIVE_RE = /^(\s*)@([A-Za-z_][A-Za-z0-9_-]*)\b\s*(.*?)\s*$/;
 
@@ -42,12 +42,15 @@ export interface ParseInput {
   relPath: string;
   /** File content. */
   source: string;
+  /** Directive registry. Defaults to the Foundation registry. */
+  registry?: DirectiveRegistry;
 }
 
 /** Read a file and parse it. */
 export async function parseFile(
   file: string,
   relPath: string,
+  registry?: DirectiveRegistry,
 ): Promise<MgrDocument> {
   let source: string;
   try {
@@ -60,23 +63,28 @@ export async function parseFile(
       cause,
     });
   }
-  return parseSource({ file, relPath, source });
+  return parseSource({
+    file,
+    relPath,
+    source,
+    ...(registry ? { registry } : {}),
+  });
 }
 
 /** Parse a source string into an MgrDocument. */
 export function parseSource(input: ParseInput): MgrDocument {
   const { file, relPath, source } = input;
+  const registry = input.registry ?? createFoundationRegistry();
   const lines = splitLines(source);
 
   const rootBlocks: BlockNode[] = [];
   const imports: DirectiveNode[] = [];
   const sections: SectionNode[] = [];
 
-  // Stack: current section being filled. Top-of-stack is the target
-  // container for new blocks. Root uses `rootBlocks`.
+  // Top-of-stack is the target container for new blocks. Root uses
+  // `rootBlocks` when no @section is open.
   let currentSection: SectionNode | null = null;
 
-  // Accumulator for markdown text.
   let mdBuf: string[] = [];
   let mdStartLine = 1;
 
@@ -122,63 +130,20 @@ export function parseSource(input: ParseInput): MgrDocument {
     const arg = match[3] ?? "";
     const location = { line: lineNum, column: (match[1]?.length ?? 0) + 1 };
 
-    if (name === "section") {
-      const id = arg.trim();
-      if (id.length === 0) {
+    const def = registry.get(name);
+    if (!def) {
+      // Reserved names get a dedicated error so a future PRD can add
+      // semantics without a breaking change.
+      if (registry.isReserved(name)) {
         throw new MgrError({
-          code: "DIRECTIVE_SYNTAX",
-          messageKey: "DIRECTIVE_SYNTAX_SECTION_MISSING_ID",
+          code: "DIRECTIVE_RESERVED",
+          messageKey: "DIRECTIVE_RESERVED",
+          params: { name },
           location: locFor(file, location.line),
-          directive: "@section",
+          directive: `@${name}`,
         });
       }
-      if (!isValidSectionId(id)) {
-        throw new MgrError({
-          code: "DIRECTIVE_SYNTAX",
-          messageKey: "DIRECTIVE_SYNTAX_SECTION_INVALID_ID",
-          params: { id },
-          location: locFor(file, location.line),
-          directive: "@section",
-        });
-      }
-      const section: SectionNode = {
-        type: "section",
-        id,
-        location,
-        body: [],
-      };
-      sections.push(section);
-      // Sections do not nest in Foundation — a new @section closes the
-      // previous one and reopens at root.
-      currentSection = section;
-      rootBlocks.push(section);
-      continue;
-    }
-
-    if (name === "import") {
-      const target = arg.trim();
-      if (target.length === 0) {
-        throw new MgrError({
-          code: "DIRECTIVE_SYNTAX",
-          messageKey: "DIRECTIVE_SYNTAX_IMPORT_MISSING_PATH",
-          location: locFor(file, location.line),
-          directive: "@import",
-        });
-      }
-      const node: DirectiveNode = {
-        type: "directive",
-        name: "import" as DirectiveName,
-        arg: target,
-        location,
-      };
-      imports.push(node);
-      addBlock(node);
-      continue;
-    }
-
-    // Unknown directive — record but let validator flag it.
-    if (!KNOWN_DIRECTIVES.has(name)) {
-      const hint = suggestKnownDirective(name);
+      const hint = registry.suggest(name);
       throw new MgrError({
         code: "UNKNOWN_DIRECTIVE",
         messageKey: "UNKNOWN_DIRECTIVE",
@@ -186,6 +151,29 @@ export function parseSource(input: ParseInput): MgrDocument {
         location: locFor(file, location.line),
         directive: `@${name}`,
       });
+    }
+
+    const node = def.handler({
+      file,
+      relPath,
+      arg,
+      location,
+    });
+
+    if (node.type === "section") {
+      // Sections do not nest in Foundation — a new @section closes
+      // the previous one and reopens at root.
+      sections.push(node);
+      currentSection = node;
+      rootBlocks.push(node);
+      continue;
+    }
+
+    // Directive node. `@import` gets tracked in the imports list so
+    // the graph builder can consume it.
+    addBlock(node);
+    if (node.name === "import") {
+      imports.push(node);
     }
   }
 
@@ -201,8 +189,6 @@ export function parseSource(input: ParseInput): MgrDocument {
 }
 
 function splitLines(src: string): string[] {
-  // Preserve empty trailing line if present; strip trailing CR for
-  // deterministic behavior across platforms.
   return src.split(/\r\n|\r|\n/);
 }
 
@@ -210,49 +196,6 @@ function locFor(file: string, line: number): MgrErrorLocation {
   return { file, line };
 }
 
-function isValidSectionId(id: string): boolean {
-  return /^[A-Za-z0-9._-]+$/.test(id);
-}
-
 function toPosix(p: string): string {
   return p.split(path.sep).join("/");
-}
-
-/** Levenshtein-lite suggestion among known directives. */
-function suggestKnownDirective(name: string): string | undefined {
-  let best: string | undefined;
-  let bestDist = Infinity;
-  for (const candidate of KNOWN_DIRECTIVES) {
-    const d = editDistance(name, candidate);
-    if (d < bestDist) {
-      bestDist = d;
-      best = candidate;
-    }
-  }
-  return bestDist <= 2 ? best : undefined;
-}
-
-function editDistance(a: string, b: string): number {
-  if (a === b) return 0;
-  const m = a.length;
-  const n = b.length;
-  if (m === 0) return n;
-  if (n === 0) return m;
-  const dp: number[] = new Array(n + 1).fill(0);
-  for (let j = 0; j <= n; j++) dp[j] = j;
-  for (let i = 1; i <= m; i++) {
-    let prev = dp[0] ?? 0;
-    dp[0] = i;
-    for (let j = 1; j <= n; j++) {
-      const tmp = dp[j] ?? 0;
-      const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
-      dp[j] = Math.min(
-        (dp[j] ?? 0) + 1, // deletion
-        (dp[j - 1] ?? 0) + 1, // insertion
-        prev + cost, // substitution
-      );
-      prev = tmp;
-    }
-  }
-  return dp[n] ?? 0;
 }

@@ -109,6 +109,11 @@ export const vi: Messages = {
         message: "Directive không xác định: @{name}",
         suggestion: "Có phải bạn muốn @{hint} ?",
       },
+      DIRECTIVE_RESERVED: {
+        message: "Directive @{name} đã được giữ chỗ, chưa được phép dùng",
+        suggestion:
+          "Tên này được MGR dành riêng cho bản phát hành sau. Hãy chọn tên khác, hoặc đợi PRD định nghĩa nó.",
+      },
       DIRECTIVE_SYNTAX_SECTION_MISSING_ID: {
         message: "Directive @section yêu cầu id",
         suggestion: "Viết `@section <id>` (ví dụ `@section intro`).",

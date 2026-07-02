@@ -32,6 +32,16 @@ export {
   type ParseInput,
 } from "./parser/index.js";
 
+export {
+  DirectiveRegistry,
+  RESERVED_DIRECTIVES,
+  createFoundationRegistry,
+  type DirectiveCategory,
+  type DirectiveContext,
+  type DirectiveDefinition,
+  type DirectiveHandler,
+} from "./parser/directives.js";
+
 export type {
   BlockNode,
   DirectiveName,
