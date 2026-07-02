@@ -140,6 +140,11 @@ export const RESERVED_DIRECTIVES: ReadonlySet<string> = new Set([
   "rollback",
   "conflict-policy",
   "snapshot",
+  // PRD-014 Documentation Schema
+  "purpose",
+  "failure",
+  "notes",
+  "examples",
 ]);
 
 export class DirectiveRegistry {

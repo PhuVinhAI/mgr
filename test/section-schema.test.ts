@@ -35,6 +35,8 @@ describe("section schema validator (PRD-008 §15a)", () => {
         "Money >= Quantity * 5",
         "Effect:",
         "Money -= Quantity * 5",
+        "Purpose:",
+        "Apply the Buy Lemons transaction atomically.",
       ].join("\n"),
     });
     const result = await compile({ root, buildDate: new Date(0) });
@@ -53,13 +55,13 @@ describe("section schema validator (PRD-008 §15a)", () => {
         "On Action(Buy Lemons)",
         "Precondition:",
         "Money >= 5",
+        "Purpose:",
+        "Placeholder purpose.",
       ].join("\n"),
     });
-    await expect(compile({ root, buildDate: new Date(0) })).rejects.toThrow(
-      MgrErrorList,
-    );
     try {
       await compile({ root, buildDate: new Date(0) });
+      throw new Error("expected compile to throw");
     } catch (err) {
       expect(err).toBeInstanceOf(MgrErrorList);
       const errs = (err as MgrErrorList).errors;
@@ -83,6 +85,8 @@ describe("section schema validator (PRD-008 §15a)", () => {
         "Money >= 5",
         "Effect:",
         "Money -= 5",
+        "Purpose:",
+        "Placeholder purpose.",
       ].join("\n"),
     });
     try {
@@ -110,6 +114,8 @@ describe("section schema validator (PRD-008 §15a)", () => {
         "Money >= 5",
         "Effect:",
         "Money -= 5",
+        "Purpose:",
+        "Placeholder purpose.",
       ].join("\n"),
     });
     try {
@@ -179,6 +185,8 @@ describe("section schema validator (PRD-008 §15a)", () => {
         "Money -= 5",
         "Effect:",
         "Reputation += 1",
+        "Purpose:",
+        "Placeholder purpose.",
       ].join("\n"),
     });
     try {
@@ -196,8 +204,7 @@ describe("section schema validator (PRD-008 §15a)", () => {
   it("tolerates value: type lines inside content blocks (e.g. Parameters)", async () => {
     // "Quantity: Integer" under "Parameters:" is content, not a new
     // block heading. Only names in the §15a.10 catalog participate in
-    // schema enforcement. Everything else is skipped silently so
-    // Parameter/value pairs do not trigger false UNKNOWN_BLOCK errors.
+    // schema enforcement.
     root = await makeProject({
       "mgr.config.json": JSON.stringify({ name: "content", entry: "main.md" }),
       "src/main.md": [
@@ -209,6 +216,8 @@ describe("section schema validator (PRD-008 §15a)", () => {
         "Parameters:",
         "Quantity: Integer",
         "Price: Rational",
+        "Purpose:",
+        "Placeholder purpose.",
       ].join("\n"),
     });
     const result = await compile({ root, buildDate: new Date(0) });
@@ -229,6 +238,8 @@ describe("section schema validator (PRD-008 §15a)", () => {
         "Quantity: Integer",
         "Preconditions:",
         "Money >= Quantity * 5",
+        "Purpose:",
+        "Placeholder purpose.",
       ].join("\n"),
     });
     const result = await compile({ root, buildDate: new Date(0) });
@@ -247,6 +258,8 @@ describe("section schema validator (PRD-008 §15a)", () => {
         "Start of Day.",
         "Effect:",
         "Weather := Weighted(Sunny: 60, Rainy: 30, Heat Wave: 10)",
+        "Purpose:",
+        "Placeholder purpose.",
       ].join("\n"),
     });
     const result = await compile({ root, buildDate: new Date(0) });
@@ -254,6 +267,7 @@ describe("section schema validator (PRD-008 §15a)", () => {
   });
 
   it("accepts a Variable with Visibility (§15a.1)", async () => {
+    // Variable Purpose is WARNING, not ERROR; build passes.
     root = await makeProject({
       "mgr.config.json": JSON.stringify({ name: "vv", entry: "main.md" }),
       "src/main.md": [
@@ -268,6 +282,7 @@ describe("section schema validator (PRD-008 §15a)", () => {
   });
 
   it("accepts a Formula with just a body (§15a.3)", async () => {
+    // Formula Purpose is WARNING; body is an arithmetic expression.
     root = await makeProject({
       "mgr.config.json": JSON.stringify({ name: "ff", entry: "main.md" }),
       "src/main.md": [
@@ -279,5 +294,239 @@ describe("section schema validator (PRD-008 §15a)", () => {
     });
     const result = await compile({ root, buildDate: new Date(0) });
     expect(result.validation.ok).toBe(true);
+  });
+});
+
+describe("documentation schema validator (PRD-014)", () => {
+  let root: string;
+  afterEach(async () => {
+    if (root) await rm(root, { recursive: true, force: true });
+  });
+
+  it("requires Purpose on Rule at ERROR level", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({ name: "np", entry: "main.md" }),
+      "src/main.md": [
+        "@section rules",
+        "",
+        "Rule ApplyFoo",
+        "Kind: Transformation",
+        "Trigger:",
+        "On Action(Foo)",
+        "Precondition:",
+        "true",
+        "Effect:",
+        "X += 1",
+      ].join("\n"),
+    });
+    try {
+      await compile({ root, buildDate: new Date(0) });
+      throw new Error("expected compile to throw");
+    } catch (err) {
+      expect(err).toBeInstanceOf(MgrErrorList);
+      const errs = (err as MgrErrorList).errors;
+      expect(
+        errs.some((e) => e.code === "DOCUMENTATION_PURPOSE_MISSING"),
+      ).toBe(true);
+    }
+  });
+
+  it("requires Purpose on Action at ERROR level", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({ name: "np-act", entry: "main.md" }),
+      "src/main.md": [
+        "@section actions",
+        "",
+        "Action Foo",
+        "Intent:",
+        "foo",
+      ].join("\n"),
+    });
+    try {
+      await compile({ root, buildDate: new Date(0) });
+      throw new Error("expected compile to throw");
+    } catch (err) {
+      expect(err).toBeInstanceOf(MgrErrorList);
+      const errs = (err as MgrErrorList).errors;
+      expect(
+        errs.some((e) => e.code === "DOCUMENTATION_PURPOSE_MISSING"),
+      ).toBe(true);
+    }
+  });
+
+  it("requires Purpose on Event at ERROR level", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({ name: "np-evt", entry: "main.md" }),
+      "src/main.md": [
+        "@section events",
+        "",
+        "Event Foo",
+        "Phase: Pre",
+        "Trigger:",
+        "Start of Day.",
+        "Effect:",
+        "X := 1",
+      ].join("\n"),
+    });
+    try {
+      await compile({ root, buildDate: new Date(0) });
+      throw new Error("expected compile to throw");
+    } catch (err) {
+      expect(err).toBeInstanceOf(MgrErrorList);
+      const errs = (err as MgrErrorList).errors;
+      expect(
+        errs.some((e) => e.code === "DOCUMENTATION_PURPOSE_MISSING"),
+      ).toBe(true);
+    }
+  });
+
+  it("Purpose on Variable is only WARNING — build passes", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({ name: "var-no-p", entry: "main.md" }),
+      "src/main.md": [
+        "@section state",
+        "",
+        "Variable Money",
+        "Visibility: Public",
+      ].join("\n"),
+    });
+    const result = await compile({ root, buildDate: new Date(0) });
+    expect(result.validation.ok).toBe(true);
+    expect(
+      result.validation.warnings.some(
+        (w) => w.code === "DOCUMENTATION_PURPOSE_MISSING",
+      ),
+    ).toBe(true);
+  });
+
+  it("Failure on Rule Transformation is WARNING — build passes", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({ name: "no-fail", entry: "main.md" }),
+      "src/main.md": [
+        "@section rules",
+        "",
+        "Rule ApplyFoo",
+        "Kind: Transformation",
+        "Trigger:",
+        "On Action(Foo)",
+        "Precondition:",
+        "true",
+        "Effect:",
+        "X += 1",
+        "Purpose:",
+        "Increment X on Foo action.",
+      ].join("\n"),
+    });
+    const result = await compile({ root, buildDate: new Date(0) });
+    expect(result.validation.ok).toBe(true);
+    expect(
+      result.validation.warnings.some(
+        (w) => w.code === "DOCUMENTATION_FAILURE_MISSING",
+      ),
+    ).toBe(true);
+  });
+
+  it("Failure on Action is WARNING — build passes", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({ name: "act-no-fail", entry: "main.md" }),
+      "src/main.md": [
+        "@section actions",
+        "",
+        "Action Foo",
+        "Intent:",
+        "foo",
+        "Purpose:",
+        "Placeholder purpose.",
+      ].join("\n"),
+    });
+    const result = await compile({ root, buildDate: new Date(0) });
+    expect(result.validation.ok).toBe(true);
+    expect(
+      result.validation.warnings.some(
+        (w) => w.code === "DOCUMENTATION_FAILURE_MISSING",
+      ),
+    ).toBe(true);
+  });
+
+  it("Formula body that reads as prose emits a warning (PRD-009 §18a)", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({ name: "prose", entry: "main.md" }),
+      "src/main.md": [
+        "@section rules",
+        "",
+        "Formula CustomersToday",
+        "Customers depend on weather and price then multiply",
+      ].join("\n"),
+    });
+    const result = await compile({ root, buildDate: new Date(0) });
+    expect(result.validation.ok).toBe(true);
+    expect(
+      result.validation.warnings.some(
+        (w) => w.code === "FORMULA_BODY_INVALID",
+      ),
+    ).toBe(true);
+  });
+
+  it("Formula body that is a valid expression does not warn", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({ name: "expr", entry: "main.md" }),
+      "src/main.md": [
+        "@section rules",
+        "",
+        "Formula Damage",
+        "Attack - Defense",
+      ].join("\n"),
+    });
+    const result = await compile({ root, buildDate: new Date(0) });
+    expect(
+      result.validation.warnings.some(
+        (w) => w.code === "FORMULA_BODY_INVALID",
+      ),
+    ).toBe(false);
+  });
+
+  it("Formula body with Piecewise When/Then does not warn", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({ name: "piece", entry: "main.md" }),
+      "src/main.md": [
+        "@section rules",
+        "",
+        "Formula WeatherModifier",
+        "When Weather = Rainy      Then 0.5",
+        "When Weather = Heat Wave  Then 2.0",
+        "Otherwise                 Then 1.0",
+      ].join("\n"),
+    });
+    const result = await compile({ root, buildDate: new Date(0) });
+    expect(
+      result.validation.warnings.some(
+        (w) => w.code === "FORMULA_BODY_INVALID",
+      ),
+    ).toBe(false);
+  });
+
+  it("full documentation block set passes without warnings", async () => {
+    root = await makeProject({
+      "mgr.config.json": JSON.stringify({ name: "full", entry: "main.md" }),
+      "src/main.md": [
+        "@section rules",
+        "",
+        "Rule ApplyFoo",
+        "Kind: Transformation",
+        "Trigger:",
+        "On Action(Foo)",
+        "Precondition:",
+        "X < 10",
+        "Effect:",
+        "X += 1",
+        "Purpose:",
+        "Increment X when Foo action fires and X is under 10.",
+        "Failure:",
+        "Reject action; X does not change.",
+      ].join("\n"),
+    });
+    const result = await compile({ root, buildDate: new Date(0) });
+    expect(result.validation.ok).toBe(true);
+    expect(result.validation.warnings.length).toBe(0);
   });
 });

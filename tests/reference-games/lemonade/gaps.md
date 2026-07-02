@@ -68,6 +68,9 @@ in the entry.
 - [x] Round 2 gaps triaged into 3 new PRDs (011/012/013) + PRD-008 amendment
 - [x] Round 2: Lemonade rewritten to RFC-style Section Schema
 - [x] Round 2: Compiler + validator + tests updated (74/74 passing)
+- [x] Round 3 gaps identified (documentation schema, Formula body prose)
+- [x] Round 3: PRD-014 new + PRD-008 v1.2 + PRD-009 v1.1 amendments
+- [x] Round 3: Lemonade Purpose/Failure blocks + Hangman built (84/84 passing)
 
 ---
 
@@ -406,14 +409,97 @@ but the enforcement gap left GPS silent.
 - Runtime test bumped to v1.5 + PRD-011/012/013 body assertions.
 - Total: 74/74 tests passing.
 
+---
+
+## Round 3 gaps
+
+Round 2 shipped a machine-parsable Kernel. Reading the Lemonade v2
+output showed one axis was still missing: **why each declaration
+exists**. The output had structure, but no motivation — a Rule and its
+neighbour looked identical unless you inferred intent from the name.
+
+### GAP-013 — Documentation Schema  ✅ CLOSED
+
+**File:** all Lemonade `src/*.md` (v2)
+**PRDs consulted:** PRD-008 §15a (only execution-shape blocks),
+PRD-014 (new)
+**Category:** package
+
+**What I needed to decide:**
+When a Rule / Action / Event exists, how does the LLM know **why**?
+The v2 files declared execution shape correctly, but a Rule like
+`ApplyBuyLemons` gave no reason for its existence beyond the name.
+Rule chains with modifier layering (`ApplyShortage`, `RollCustomers`)
+became opaque quickly.
+
+**What the PRDs said:**
+PRD-008 §15a only defined execution blocks (`Kind`, `Trigger`,
+`Precondition`, `Effect`, `Priority`, ...). Nothing enforced
+documentation.
+
+**Resolution:**
+- **PRD-014 Documentation Schema** (new) — Purpose / Failure / Notes /
+  Examples blocks. Purpose is ERROR-level on Rule/Action/Event.
+  Failure is WARNING-level on Rule Transformation/Guard/Action.
+- PRD-008 v1.1 → v1.2 §15a.11 — documentation blocks added to §15a
+  block catalog.
+- Validator extended with per-kind Purpose/Failure checks; warnings
+  channel wired into ValidateResult.
+- 5 new error codes.
+- Lemonade v3: every Rule / Action / Event carries Purpose; every
+  Guard / Transformation / Action carries Failure.
+
+---
+
+### GAP-014 — Formula body could still be prose  ✅ CLOSED
+
+**File:** any `Formula X` body without operators
+**PRDs consulted:** PRD-009 §3-§14
+**Category:** formula
+
+**What I needed to decide:**
+PRD-009 defined Formula as an expression tree, but the validator did
+not enforce that authors write body as an expression. A prose sentence
+in a Formula body would silently ship into the Prompt Specification.
+
+**What the PRDs said:**
+Nothing enforced. Grammar was implicit.
+
+**Resolution:**
+- PRD-009 v1.0 → v1.1 §18a — Formula body must be a single
+  expression, Piecewise, Named reference, or Bounded expression.
+- Validator adds heuristic prose detection; emits
+  `FORMULA_BODY_INVALID` at WARNING level.
+- Lemonade v3 tightened Formula bodies (already expression-only).
+
+---
+
+## Round 3 triage summary
+
+| Gap | Resolution |
+| --- | --- |
+| GAP-013 | **PRD-014 (new)** + PRD-008 v1.2 §15a.11 |
+| GAP-014 | PRD-009 v1.1 §18a + Formula body validator |
+
+**Round 3 code impact:**
+- `RUNTIME_SPEC_VERSION` bumped 1.5 → 1.6 (state-machine gains a
+  short "Rule documentation" paragraph).
+- 4 new reserved directive names (purpose, failure, notes, examples).
+- Validator schema.ts refactored: emit into errors + warnings arrays,
+  Documentation Schema pass added, Formula body prose heuristic added.
+- 5 new error codes; 84 tests passing.
+- Lemonade rewritten to include Purpose on every Rule / Action /
+  Event, Failure on every Guard / Transformation / Action.
+
 **Next step:**
-Reference Game #2 to expose gaps NOT covered by Lemonade. Candidates:
+Reference Game #2 — Hangman — now exists at
+`tests/reference-games/hangman/`. It exposed 3 new gaps (see
+`hangman/gaps.md`):
 
-- Tic-Tac-Toe → tests adversary/turn-of, End Conditions symmetry.
-- Hangman → progressive reveal (Private → Public transitions) and
-  heavy Action Resolution (single-letter input, ambiguity).
-- Business Mini → multiple Persistent Entities + Collections;
-  stresses PRD-013 Query & Selector.
+- GAP-010 String containment operator (`Letter in Word`).
+- GAP-011 Visibility transition (Hidden → Public at ending).
+- GAP-012 Ambiguous single-character input (closed by convention).
 
-PRD-013 in particular remains unstressed by Lemonade; Business Mini
-would be the first game to force it.
+Follow-up candidates: PRD-009 v1.2 §8a String Operators (closes
+GAP-010), PRD-006 v1.2 §11b Visibility Transition (closes GAP-011),
+Reference Game #3 (Business Mini) for PRD-013 Query.

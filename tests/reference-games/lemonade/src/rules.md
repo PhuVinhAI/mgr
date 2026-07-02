@@ -2,22 +2,36 @@
 
 <!-- PRD-008 §8 Rules + PRD-008 §15a.4 Section Schema +
      PRD-010 Rule Language + PRD-009 Formula System +
-     PRD-011 Rule Execution Model. -->
+     PRD-011 Rule Execution Model +
+     PRD-014 Documentation Schema. -->
 
 ## Named formulas
 
-<!-- PRD-009 §14 Named formulas — resolve at Build time. -->
+<!-- PRD-009 §14 Named formulas — resolve at Build time.
+     PRD-009 §18a — body must be an expression, not prose. -->
 
 Formula BaseDemand
 Reputation * 0.5 + 10
+
+Purpose:
+Baseline number of customers before weather or price modifiers. Higher
+Reputation attracts more customers linearly.
 
 Formula WeatherModifier
 When Weather = Rainy      Then 0.5
 When Weather = Heat Wave  Then 2.0
 Otherwise                 Then 1.0
 
+Purpose:
+Multiplicative demand modifier applied to BaseDemand. Rainy halves,
+Heat Wave doubles, Sunny is neutral.
+
 Formula CustomersToday
 BaseDemand * WeatherModifier - Price * 0.05
+
+Purpose:
+Final customer count for the day. Falls with price, rises with weather
+and reputation. Monotonic hints below constrain LLM reasoning.
 
 ## Purchase rules
 
@@ -33,6 +47,13 @@ On Action(Buy Lemons)
 
 Precondition:
 Money >= Quantity * 5
+
+Purpose:
+Block the Buy Lemons action when the player cannot afford the total.
+Prevents Money from going negative from a lemon purchase.
+
+Failure:
+Reject action; ApplyBuyLemons does not fire; no state change.
 
 Rule ApplyBuyLemons
 
@@ -51,6 +72,15 @@ Lemons += Quantity
 Priority:
 0
 
+Purpose:
+Perform the Buy Lemons purchase — deduct Money and add Lemons in one
+atomic step (PRD-011 §9).
+
+Failure:
+If Precondition fails at execution time (state changed between guard
+and simulation), rule is skipped whole and Turn History records
+SkippedByPrecondition.
+
 Rule CanBuySugar
 
 Kind: Guard
@@ -60,6 +90,12 @@ On Action(Buy Sugar)
 
 Precondition:
 Money >= Quantity * 3
+
+Purpose:
+Block the Buy Sugar action when the player cannot afford the total.
+
+Failure:
+Reject action; ApplyBuySugar does not fire.
 
 Rule ApplyBuySugar
 
@@ -78,6 +114,12 @@ Sugar += Quantity
 Priority:
 0
 
+Purpose:
+Perform the Buy Sugar purchase atomically.
+
+Failure:
+If Precondition fails at execution time, rule is skipped whole.
+
 Rule CanBuyIce
 
 Kind: Guard
@@ -87,6 +129,12 @@ On Action(Buy Ice)
 
 Precondition:
 Money >= Quantity * 2
+
+Purpose:
+Block the Buy Ice action when the player cannot afford the total.
+
+Failure:
+Reject action; ApplyBuyIce does not fire.
 
 Rule ApplyBuyIce
 
@@ -104,6 +152,12 @@ Ice += Quantity
 
 Priority:
 0
+
+Purpose:
+Perform the Buy Ice purchase atomically.
+
+Failure:
+If Precondition fails at execution time, rule is skipped whole.
 
 ## Selling rule
 
@@ -130,6 +184,14 @@ Money += Price
 Priority:
 0
 
+Purpose:
+Sell exactly one cup: consume one lemon, one sugar, IcePerCup ice
+cubes, one customer, and credit Price to Money. Runtime iterates this
+Rule until any Precondition subterm fails.
+
+Failure:
+Stop iterating; End Day Auto Action then fires (see actions.md).
+
 ## Demand rule
 
 <!-- PRD-009 §11 Monotonic hints — direction only, not full formula. -->
@@ -146,6 +208,10 @@ Customers := Max(0, Round(CustomersToday))
 
 Priority:
 5
+
+Purpose:
+Convert the CustomersToday formula into the concrete Customers count
+at the start of Simulation Phase. Clamped to a non-negative integer.
 
 Rule ApplyShortage
 
@@ -167,6 +233,11 @@ LemonPrice := 10
 Priority:
 10
 
+Purpose:
+Double LemonPrice from the baseline 5 cents to 10 cents on shortage
+days. Runs before RollCustomers in Pre Event Phase due to higher
+Priority.
+
 ## Overnight rule
 
 <!-- Runs at Turn boundary — modelled as Post Event before Commit. -->
@@ -187,6 +258,11 @@ LemonPrice := 5
 
 Priority:
 0
+
+Purpose:
+Reset the day: melt leftover Ice, advance the calendar, reset the
+IcePerCup recipe, and clear per-day shortage flags so tomorrow starts
+from a known baseline.
 
 ## Rule priority
 

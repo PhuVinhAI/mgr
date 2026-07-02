@@ -192,6 +192,36 @@ export const vi: Messages = {
         suggestion:
           "Khai báo `Kind:` rõ ràng (Guard | Transformation | Trigger cho Rule, Persistent | Transient cho Entity). Xem PRD-008 §15a.",
       },
+      DOCUMENTATION_PURPOSE_MISSING: {
+        message:
+          "{kind} \"{name}\" thiếu block `Purpose:` bắt buộc",
+        suggestion:
+          "Thêm `Purpose:` với 1–3 câu giải thích tại sao {kind} này tồn tại. Xem PRD-014 §6.",
+      },
+      DOCUMENTATION_FAILURE_MISSING: {
+        message:
+          "{kind} \"{name}\" nên có block `Failure:`",
+        suggestion:
+          "Thêm `Failure:` mô tả điều gì xảy ra khi Precondition không đạt. Xem PRD-014 §7.",
+      },
+      DOCUMENTATION_BLOCK_EMPTY: {
+        message:
+          "{kind} \"{name}\" có block `{block}:` rỗng",
+        suggestion:
+          "Điền nội dung block hoặc xóa heading. Xem PRD-014.",
+      },
+      DOCUMENTATION_PURPOSE_TAUTOLOGY: {
+        message:
+          "Purpose của {kind} \"{name}\" chỉ lặp lại tên",
+        suggestion:
+          "Purpose phải giải thích ý định, không nhắc lại tên declaration. Xem PRD-014 §6.",
+      },
+      FORMULA_BODY_INVALID: {
+        message:
+          "Body của Formula \"{name}\" không phải expression",
+        suggestion:
+          "Body Formula phải là expression theo PRD-009 §18a — dòng đơn, Piecewise (When/Then/Otherwise), Named Formula reference, hoặc Bounded expression. Cấm văn xuôi.",
+      },
       INTERNAL: {
         message: "Lỗi nội bộ của compiler",
         suggestion: "Vui lòng báo cáo kèm theo nguồn gây lỗi.",

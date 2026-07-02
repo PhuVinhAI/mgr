@@ -19,7 +19,7 @@
  */
 
 /** Bumped when a Runtime Layer body changes shape or wording. */
-export const RUNTIME_SPEC_VERSION = "1.5";
+export const RUNTIME_SPEC_VERSION = "1.6";
 
 export interface RuntimeSectionDef {
   /** Canonical section id (matches PSF §11). */
@@ -121,6 +121,15 @@ phase, they resolve by Priority (higher runs first): additive
 mutations sum, multiplicative mutations compose, and assignments
 require an explicit Priority winner. Same-variable assignments at
 equal Priority are a build error, not a runtime coin flip.
+
+Rule documentation.
+Every rule, action, and event carries a Purpose block that states
+why the declaration exists. Use Purpose when choosing which rule
+covers an edge case — a rule whose Purpose does not name the case
+is the wrong rule. Failure blocks describe what happens when a
+Precondition fails; consult them before narrating a rejection.
+Documentation is read-only; do not synthesize state changes from
+Purpose or Failure text.
 
 Lifecycle invariants that hold on every turn:
 - Input is read exactly once.

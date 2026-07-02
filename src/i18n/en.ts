@@ -193,6 +193,36 @@ export const en: Messages = {
         suggestion:
           "Declare `Kind:` explicitly (Guard | Transformation | Trigger for Rule, Persistent | Transient for Entity). See PRD-008 §15a.",
       },
+      DOCUMENTATION_PURPOSE_MISSING: {
+        message:
+          "{kind} \"{name}\" is missing required `Purpose:` block",
+        suggestion:
+          "Add a `Purpose:` block with 1-3 sentences explaining why this {kind} exists. See PRD-014 §6.",
+      },
+      DOCUMENTATION_FAILURE_MISSING: {
+        message:
+          "{kind} \"{name}\" is missing recommended `Failure:` block",
+        suggestion:
+          "Add a `Failure:` block describing what happens when the Precondition fails. See PRD-014 §7.",
+      },
+      DOCUMENTATION_BLOCK_EMPTY: {
+        message:
+          "{kind} \"{name}\" has an empty `{block}:` block",
+        suggestion:
+          "Either fill in the block content or remove the heading. See PRD-014.",
+      },
+      DOCUMENTATION_PURPOSE_TAUTOLOGY: {
+        message:
+          "{kind} \"{name}\" Purpose only restates the name",
+        suggestion:
+          "Purpose should explain the intent, not restate the declaration name. See PRD-014 §6.",
+      },
+      FORMULA_BODY_INVALID: {
+        message:
+          "Formula \"{name}\" body does not look like an expression",
+        suggestion:
+          "Formula body must be an expression per PRD-009 §18a — single line, Piecewise (When/Then/Otherwise), Named Formula reference, or Bounded expression. Prose is not allowed.",
+      },
       INTERNAL: {
         message: "Internal compiler error",
         suggestion: "Please report this along with the source that triggered it.",

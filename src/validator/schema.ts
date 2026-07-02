@@ -1,26 +1,30 @@
 /**
- * Section Schema Validator — PRD-008 §15a.
+ * Section + Documentation Schema Validator.
  *
- * MGR Kernel PRDs (008/010/012/013) describe a fixed block schema for
- * every kind of declaration in a Game Package. This module walks the
- * parsed markdown inside each section and enforces that schema:
+ * Combines PRD-008 §15a (Section Schema — required and forbidden
+ * execution blocks per Kind) with PRD-014 (Documentation Schema —
+ * required Purpose block on Rule/Action/Event and recommended
+ * Failure block on Rule Transformation/Guard and Action) plus
+ * PRD-009 §18a (Formula body must be an expression, not prose).
  *
- * - Every declaration line (`Rule <Name>`, `Entity <Name>`, ...) must
- *   be followed by the required blocks for that kind.
- * - Optional blocks are accepted.
- * - Block names outside the schema are rejected with a stable code.
- * - Duplicate block names within the same declaration are rejected.
+ * Emission:
+ *   - errors    → build fails. Missing execution block, forbidden
+ *                 block, duplicate block, missing Kind, missing
+ *                 required Purpose.
+ *   - warnings  → build passes; CLI lists them. Recommended blocks
+ *                 (Purpose on non-Rule kinds, Failure on Rule
+ *                 Transformation/Guard/Action), invalid Formula body.
  *
- * The scanner is intentionally line-based and forgiving of surrounding
- * prose (Markdown headings, HTML comments) so authors can annotate
- * around the declaration without breaking validation.
+ * The scanner is line-based and forgiving of surrounding prose so
+ * authors can annotate around declarations with Markdown headings and
+ * HTML comments without breaking validation.
  */
 import * as path from "node:path";
 import { MgrError } from "../errors/index.js";
 import type { ProjectGraph } from "../graph/index.js";
 import type { BlockNode, MarkdownBlockNode } from "../parser/ast.js";
 
-/** The seven declaration kinds §15a enumerates. */
+/** The declaration kinds §15a enumerates. */
 type DeclKind =
   | "Variable"
   | "Entity"
@@ -43,19 +47,35 @@ interface Declaration {
   entityKind?: string;
   /** Block name → line where it was declared. */
   blocks: Map<string, number>;
+  /**
+   * Lines collected between the declaration header and the first
+   * recognized block heading. Used to validate Formula body per
+   * PRD-009 §18a.
+   */
+  bodyLines: string[];
   /** Absolute line of the declaration header. */
   startLine: number;
   file: string;
 }
 
-const DECL_RE = /^(Variable|Entity|Formula|Rule|Event|Query|Auto Action|Action)\s+(\S.*?)\s*$/;
+/**
+ * A declaration header is `<Kind> <Name>` on its own line, where the
+ * Name is one or more Title-Case identifiers separated by single
+ * spaces. This deliberately excludes sentence-like text so a paragraph
+ * that happens to begin with "Rule" or "Action" inside a Purpose /
+ * Notes block does not get misparsed as a declaration.
+ */
+const DECL_RE = /^(Variable|Entity|Formula|Rule|Event|Query|Auto Action|Action)\s+([A-Z][A-Za-z0-9]*(?:\s+[A-Z][A-Za-z0-9]*)*)\s*$/;
 const BLOCK_RE = /^([A-Z][A-Za-z ]*[A-Za-z]):\s*(.*)$/;
 
 /**
- * The block-name catalog. Anything outside this set inside a
- * declaration is `SECTION_SCHEMA_UNKNOWN_BLOCK`.
+ * The block-name catalog. Execution blocks come from §15a.1-.7.
+ * Documentation blocks come from PRD-014 §3.
+ * Anything outside this set is treated as content (Parameter/value
+ * inside a block, etc.) — see §15a.10.
  */
 const KNOWN_BLOCKS: ReadonlySet<string> = new Set([
+  // Execution blocks
   "Visibility",
   "Kind",
   "Type",
@@ -79,13 +99,14 @@ const KNOWN_BLOCKS: ReadonlySet<string> = new Set([
   "Body",
   "Match",
   "Input",
+  // Documentation blocks (PRD-014 §3)
+  "Purpose",
+  "Failure",
+  "Notes",
+  "Examples",
 ]);
 
-/**
- * Per-kind required and forbidden blocks. §15a.
- * For Rule we key by "Rule <SubKind>" once SubKind is known; the
- * ruleKind pass runs after the initial catalog.
- */
+/** Per-kind required execution blocks. §15a. */
 const REQUIRED: Record<string, ReadonlyArray<string>> = {
   Variable: ["Visibility"],
   Entity: ["Kind", "Attributes"],
@@ -99,9 +120,45 @@ const REQUIRED: Record<string, ReadonlyArray<string>> = {
   Query: [],
 };
 
+/** Per-kind forbidden blocks. §15a. */
 const FORBIDDEN: Record<string, ReadonlyArray<string>> = {
   "Rule Guard": ["Effect"],
 };
+
+/**
+ * PRD-014 §4 — Purpose required at ERROR level for these kinds.
+ * Any decl whose schema-key hits this set must declare a Purpose
+ * block; missing → hard error.
+ */
+const PURPOSE_ERROR_KINDS: ReadonlySet<string> = new Set([
+  "Rule Guard",
+  "Rule Transformation",
+  "Rule Trigger",
+  "Event",
+  "Action",
+  "Auto Action",
+]);
+
+/**
+ * PRD-014 §4 — Purpose required at WARNING level for these kinds.
+ * Missing → advisory; build still passes.
+ */
+const PURPOSE_WARNING_KINDS: ReadonlySet<string> = new Set([
+  "Entity",
+  "Variable",
+  "Formula",
+  "Query",
+]);
+
+/**
+ * PRD-014 §4 — Failure required at WARNING level for these kinds.
+ * These are declarations that can meaningfully reject player input.
+ */
+const FAILURE_WARNING_KINDS: ReadonlySet<string> = new Set([
+  "Rule Transformation",
+  "Rule Guard",
+  "Action",
+]);
 
 export function validateSectionSchema(graph: ProjectGraph): {
   errors: MgrError[];
@@ -115,7 +172,7 @@ export function validateSectionSchema(graph: ProjectGraph): {
     if (!doc) continue;
     const absFile = path.join(graph.srcDir, doc.relPath);
     for (const block of doc.blocks) {
-      collectDeclarations(block, absFile, errors);
+      collectDeclarations(block, absFile, errors, warnings);
     }
   }
 
@@ -126,21 +183,23 @@ function collectDeclarations(
   block: BlockNode,
   file: string,
   errors: MgrError[],
+  warnings: MgrError[],
 ): void {
   if (block.type === "section") {
     for (const child of block.body) {
-      collectDeclarations(child, file, errors);
+      collectDeclarations(child, file, errors, warnings);
     }
     return;
   }
   if (block.type !== "markdown") return;
-  scanMarkdown(block, file, errors);
+  scanMarkdown(block, file, errors, warnings);
 }
 
 function scanMarkdown(
   block: MarkdownBlockNode,
   file: string,
   errors: MgrError[],
+  warnings: MgrError[],
 ): void {
   const lines = block.value.split(/\r\n|\r|\n/);
   const baseLine = block.location.line;
@@ -150,7 +209,7 @@ function scanMarkdown(
 
   const finish = (): void => {
     if (current) {
-      emitForDeclaration(current, errors);
+      emitForDeclaration(current, errors, warnings);
       current = null;
     }
   };
@@ -189,6 +248,7 @@ function scanMarkdown(
         kind,
         name,
         blocks: new Map(),
+        bodyLines: [],
         startLine: absLine,
         file,
       };
@@ -201,12 +261,14 @@ function scanMarkdown(
     if (blockMatch) {
       const blockName = blockMatch[1] ?? "";
       if (blockName === "Kind") {
-        // Peek: the Kind value can be on the same line ("Kind: Guard")
-        // or on the next non-empty line ("Kind:\nGuard").
         const inline = (blockMatch[2] ?? "").trim();
         const value = inline.length > 0 ? inline : nextValue(lines, i);
         if (current.kind === "Rule") {
-          if (value === "Guard" || value === "Transformation" || value === "Trigger") {
+          if (
+            value === "Guard" ||
+            value === "Transformation" ||
+            value === "Trigger"
+          ) {
             current.ruleKind = value;
           }
         } else if (current.kind === "Entity") {
@@ -215,13 +277,14 @@ function scanMarkdown(
       }
 
       if (!KNOWN_BLOCKS.has(blockName)) {
-        // Not a top-level block heading — could be Parameter/value line
-        // inside a block ("Quantity: Integer" under "Parameters:"). We
-        // treat it as content. Typo detection for required block names
-        // is handled downstream by SECTION_SCHEMA_MISSING_BLOCK.
+        // Not a top-level block heading — treat as content. Typo
+        // detection is downstream via SECTION_SCHEMA_MISSING_BLOCK.
         //
-        // A stricter unknown-block check needs indent-aware parsing;
-        // see PRD-008 §15a.10.
+        // If this decl still hasn't recorded a block, the line is
+        // part of the body (relevant for Formula body validation).
+        if (current.kind === "Formula" && current.blocks.size === 0) {
+          current.bodyLines.push(line);
+        }
         continue;
       }
 
@@ -243,6 +306,11 @@ function scanMarkdown(
       }
       continue;
     }
+
+    // Non-block, non-heading, non-decl content line.
+    if (current.kind === "Formula" && current.blocks.size === 0) {
+      current.bodyLines.push(line);
+    }
   }
 
   finish();
@@ -258,7 +326,11 @@ function nextValue(lines: string[], from: number): string {
   return "";
 }
 
-function emitForDeclaration(decl: Declaration, errors: MgrError[]): void {
+function emitForDeclaration(
+  decl: Declaration,
+  errors: MgrError[],
+  warnings: MgrError[],
+): void {
   const schemaKey = resolveSchemaKey(decl);
 
   // Rule declarations must always declare `Kind:` — even before the
@@ -312,6 +384,91 @@ function emitForDeclaration(decl: Declaration, errors: MgrError[]): void {
       );
     }
   }
+
+  // PRD-014 §4 — Documentation Schema.
+  const hasPurpose = decl.blocks.has("Purpose");
+  if (!hasPurpose) {
+    if (PURPOSE_ERROR_KINDS.has(schemaKey)) {
+      errors.push(
+        new MgrError({
+          code: "DOCUMENTATION_PURPOSE_MISSING",
+          messageKey: "DOCUMENTATION_PURPOSE_MISSING",
+          params: { kind: decl.kind, name: decl.name },
+          location: { file: decl.file, line: decl.startLine },
+        }),
+      );
+    } else if (PURPOSE_WARNING_KINDS.has(schemaKey)) {
+      warnings.push(
+        new MgrError({
+          code: "DOCUMENTATION_PURPOSE_MISSING",
+          messageKey: "DOCUMENTATION_PURPOSE_MISSING",
+          params: { kind: decl.kind, name: decl.name },
+          location: { file: decl.file, line: decl.startLine },
+        }),
+      );
+    }
+  }
+
+  const hasFailure = decl.blocks.has("Failure");
+  if (!hasFailure && FAILURE_WARNING_KINDS.has(schemaKey)) {
+    warnings.push(
+      new MgrError({
+        code: "DOCUMENTATION_FAILURE_MISSING",
+        messageKey: "DOCUMENTATION_FAILURE_MISSING",
+        params: { kind: decl.kind, name: decl.name },
+        location: { file: decl.file, line: decl.startLine },
+      }),
+    );
+  }
+
+  // PRD-009 §18a — Formula body must look like an expression.
+  if (decl.kind === "Formula" && !isFormulaBodyValid(decl.bodyLines)) {
+    warnings.push(
+      new MgrError({
+        code: "FORMULA_BODY_INVALID",
+        messageKey: "FORMULA_BODY_INVALID",
+        params: { name: decl.name },
+        location: { file: decl.file, line: decl.startLine },
+      }),
+    );
+  }
+}
+
+/**
+ * Heuristic check for PRD-009 §18a Formula body validity.
+ *
+ * Positive matches:
+ *   - Contains an arithmetic/comparison/boolean operator.
+ *   - Piecewise ("When ... Then ..." or "Otherwise ... Then ...").
+ *   - Bounded / aggregation / random head (Round, Clamp, Sum, Uniform, …).
+ *   - Single Named Formula reference on one line.
+ *
+ * Otherwise the body reads as prose and gets FORMULA_BODY_INVALID.
+ */
+function isFormulaBodyValid(bodyLines: string[]): boolean {
+  const nonEmpty = bodyLines.filter((l) => l.trim().length > 0);
+  if (nonEmpty.length === 0) return true; // handled by §15a schema
+  const body = nonEmpty.join("\n");
+
+  if (/\bWhen\b/.test(body) && /\bThen\b/.test(body)) return true;
+  if (/\bOtherwise\b/.test(body)) return true;
+
+  if (
+    /\b(Round|Floor|Ceil|Clamp|Min|Max|Sum|Count|Average|First|Last|Uniform|Weighted|Any|All|None|Monotonic)\s*\(/
+      .test(body)
+  ) {
+    return true;
+  }
+
+  if (/[+\-×÷*/=<>≤≥≠]/.test(body)) return true;
+  if (/\b(mod|AND|OR|NOT)\b/.test(body)) return true;
+
+  // Single-line Named Formula reference.
+  if (nonEmpty.length === 1 && /^[A-Z][A-Za-z0-9]*$/.test(body.trim())) {
+    return true;
+  }
+
+  return false;
 }
 
 function resolveSchemaKey(decl: Declaration): string {

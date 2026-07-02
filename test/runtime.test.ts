@@ -87,6 +87,12 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
     expect(result.output).toContain("intent matching");
     expect(result.output).toContain("reserved intents");
 
+    // PRD-014 Documentation Schema — Purpose + Failure are runtime-
+    // relevant even though they are pure documentation.
+    expect(result.output).toContain("Rule documentation.");
+    expect(result.output).toContain("Purpose block");
+    expect(result.output).toContain("Failure blocks");
+
     // Authority order from §7 is present in the state-machine body.
     expect(result.output).toContain("1. System Layer");
     expect(result.output).toContain("5. Player Input");
@@ -191,9 +197,8 @@ describe("runtime injection into bundle (PRD-004 §4, §7, §12, §15)", () => {
     expect(result.output).toContain(
       `- Runtime Spec Version: ${RUNTIME_SPEC_VERSION}`,
     );
-    // Version tracks the shape of the bodies. PRD-011/012/013 bumped
-    // it to 1.5.
-    expect(RUNTIME_SPEC_VERSION).toBe("1.5");
+    // Version tracks the shape of the bodies. PRD-014 bumped it to 1.6.
+    expect(RUNTIME_SPEC_VERSION).toBe("1.6");
   });
 
   it("stays deterministic across two builds with the same source", async () => {

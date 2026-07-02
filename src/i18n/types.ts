@@ -44,6 +44,11 @@ export interface ErrorCatalog {
   SECTION_SCHEMA_UNKNOWN_BLOCK: { message: string; suggestion: string };
   SECTION_SCHEMA_DUPLICATE_BLOCK: { message: string; suggestion: string };
   SECTION_SCHEMA_MISSING_KIND: { message: string; suggestion: string };
+  DOCUMENTATION_PURPOSE_MISSING: { message: string; suggestion: string };
+  DOCUMENTATION_FAILURE_MISSING: { message: string; suggestion: string };
+  DOCUMENTATION_BLOCK_EMPTY: { message: string; suggestion: string };
+  DOCUMENTATION_PURPOSE_TAUTOLOGY: { message: string; suggestion: string };
+  FORMULA_BODY_INVALID: { message: string; suggestion: string };
   INTERNAL: { message: string; suggestion: string };
 }
 

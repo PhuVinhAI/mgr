@@ -172,6 +172,11 @@ describe("directive registry (PRD-002 §14)", () => {
       "rollback",
       "conflict-policy",
       "snapshot",
+      // PRD-014 Documentation Schema
+      "purpose",
+      "failure",
+      "notes",
+      "examples",
     ]) {
       expect(RESERVED_DIRECTIVES.has(name)).toBe(true);
     }
