@@ -47,6 +47,10 @@ export const HelpScreen: React.FC<Props> = ({ version }) => {
           <Text dimColor>{m.cli.optLang}</Text>
         </Text>
         <Text>
+          <Text color="yellow"> --template &lt;name&gt;</Text>{"  "}
+          <Text dimColor>{m.cli.optTemplate}</Text>
+        </Text>
+        <Text>
           <Text color="yellow"> --help, -h</Text>{"        "}
           <Text dimColor>{m.cli.optHelp}</Text>
         </Text>

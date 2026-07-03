@@ -4,7 +4,8 @@ import { render } from "ink";
 import meow from "meow";
 import * as path from "node:path";
 import * as url from "node:url";
-import { setLocale, getMessages, type Locale } from "../i18n/index.js";
+import { readdirSync, existsSync } from "node:fs";
+import { setLocale, getMessages, getLocale, type Locale } from "../i18n/index.js";
 import { HelpScreen } from "./commands/Help.js";
 import { BuildCommand } from "./commands/Build.js";
 import { ValidateCommand } from "./commands/Validate.js";
@@ -12,9 +13,10 @@ import { InitCommand } from "./commands/Init.js";
 import { DoctorCommand } from "./commands/Doctor.js";
 
 const PKG_VERSION = "0.1.0";
+const DEFAULT_TEMPLATE = "blank";
 
 /**
- * Resolve the bundled templates directory.
+ * Resolve the bundled templates root directory.
  *
  * Both when running from `dist/cli/index.js` (production) and from
  * `src/cli/index.tsx` (dev via tsx) the templates folder sits two levels
@@ -22,7 +24,7 @@ const PKG_VERSION = "0.1.0";
  * either case.
  */
 const HERE = path.dirname(url.fileURLToPath(import.meta.url));
-const TEMPLATE_DIR = path.resolve(HERE, "..", "..", "templates", "basic");
+const TEMPLATES_ROOT = path.resolve(HERE, "..", "..", "templates");
 
 /**
  * Locale must be resolved BEFORE meow renders its help text, because
@@ -49,6 +51,7 @@ const cli = meow(getMessages().cli.meowHelp, {
   importMeta: import.meta,
   flags: {
     lang: { type: "string" },
+    template: { type: "string" },
     help: { type: "boolean", shortFlag: "h" },
     version: { type: "boolean", shortFlag: "v" },
   },
@@ -61,6 +64,23 @@ if (cli.flags.version) {
   process.exit(0);
 }
 
+/**
+ * List available built-in templates. A template is any directory under
+ * TEMPLATES_ROOT. Deterministic (sorted) so output order matches across
+ * platforms.
+ */
+function listAvailableTemplates(): string[] {
+  if (!existsSync(TEMPLATES_ROOT)) return [];
+  return readdirSync(TEMPLATES_ROOT, { withFileTypes: true })
+    .filter((e) => e.isDirectory())
+    .map((e) => e.name)
+    .sort();
+}
+
+function resolveTemplateDir(name: string, lang: Locale): string {
+  return path.join(TEMPLATES_ROOT, name, lang);
+}
+
 const command = cli.input[0];
 const root = process.cwd();
 
@@ -68,9 +88,23 @@ if (!command || cli.flags.help) {
   render(<HelpScreen version={PKG_VERSION} />);
 } else {
   switch (command) {
-    case "init":
-      render(<InitCommand root={root} templateDir={TEMPLATE_DIR} />);
+    case "init": {
+      const templateName = cli.flags.template ?? DEFAULT_TEMPLATE;
+      const lang = getLocale();
+      const templateDir = resolveTemplateDir(templateName, lang);
+      if (!existsSync(templateDir)) {
+        const m = getMessages();
+        const available = listAvailableTemplates().join(", ");
+        console.error(
+          m.init.unknownTemplate
+            .replace("{name}", `${templateName} (${lang})`)
+            .replace("{available}", available || "(none)"),
+        );
+        process.exit(1);
+      }
+      render(<InitCommand root={root} templateDir={templateDir} template={templateName} />);
       break;
+    }
     case "build":
       render(<BuildCommand root={root} />);
       break;

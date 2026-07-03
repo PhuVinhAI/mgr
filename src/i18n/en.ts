@@ -11,6 +11,7 @@ export const en: Messages = {
     cmdDoctor: "Report environment and project health",
     options: "Options",
     optLang: "Language: en | vi (default: auto)",
+    optTemplate: "Template: blank | business-sim (default: blank)",
     optHelp: "Show this help",
     optVersion: "Show version",
     unknownCommand: "Unknown command: {name}",
@@ -58,6 +59,7 @@ export const en: Messages = {
     nextSteps: "Next steps:",
     nextBuild: "  mgr build     # compile into dist/<name>-<version>.md",
     nextValidate: "  mgr validate  # check project without writing output",
+    unknownTemplate: 'Template "{name}" not found. Available templates: {available}.',
   },
   build: {
     starting: "Compiling project",

@@ -11,6 +11,7 @@ export const vi: Messages = {
     cmdDoctor: "Báo cáo tình trạng môi trường và project",
     options: "Tuỳ chọn",
     optLang: "Ngôn ngữ: en | vi (mặc định: tự động)",
+    optTemplate: "Template: blank | business-sim (mặc định: blank)",
     optHelp: "Hiển thị trợ giúp",
     optVersion: "Hiển thị phiên bản",
     unknownCommand: "Không rõ lệnh: {name}",
@@ -58,6 +59,7 @@ export const vi: Messages = {
     nextSteps: "Bước tiếp theo:",
     nextBuild: "  mgr build     # biên dịch ra dist/<tên>-<phiên bản>.md",
     nextValidate: "  mgr validate  # kiểm tra project mà không ghi output",
+    unknownTemplate: 'Không tìm thấy template "{name}". Các template có sẵn: {available}.',
   },
   build: {
     starting: "Đang biên dịch project",

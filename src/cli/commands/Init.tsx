@@ -7,6 +7,7 @@ import { getMessages, t } from "../../i18n/index.js";
 interface Props {
   root: string;
   templateDir: string;
+  template: string;
 }
 
 interface WriteReport {
@@ -45,7 +46,7 @@ async function listTemplateFiles(dir: string): Promise<string[]> {
   return out;
 }
 
-export const InitCommand: React.FC<Props> = ({ root, templateDir }) => {
+export const InitCommand: React.FC<Props> = ({ root, templateDir, template }) => {
   const m = getMessages();
   const [reports, setReports] = useState<WriteReport[]>([]);
   const [error, setError] = useState<unknown>(null);
@@ -93,6 +94,9 @@ export const InitCommand: React.FC<Props> = ({ root, templateDir }) => {
     <Box flexDirection="column">
       <Text bold color="cyan">
         {t((m) => m.init.creating, { dir: root })}
+      </Text>
+      <Text dimColor>
+        template: {template}
       </Text>
       <Box flexDirection="column" marginTop={1}>
         {reports.map((r) => (

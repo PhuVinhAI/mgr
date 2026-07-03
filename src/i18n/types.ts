@@ -73,6 +73,7 @@ export interface Messages {
     cmdDoctor: string;
     options: string;
     optLang: string;
+    optTemplate: string;
     optHelp: string;
     optVersion: string;
     unknownCommand: string;
@@ -99,6 +100,7 @@ export interface Messages {
     nextSteps: string;
     nextBuild: string;
     nextValidate: string;
+    unknownTemplate: string;
   };
   build: {
     starting: string;
