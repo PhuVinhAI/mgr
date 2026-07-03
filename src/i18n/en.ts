@@ -126,6 +126,16 @@ export const en: Messages = {
         message: "@import directive requires a path",
         suggestion: "Write `@import <path>` (e.g. `@import intro.md`).",
       },
+      DIRECTIVE_SYNTAX_DECLARATION_MISSING_NAME: {
+        message: "@{kind} directive requires a declaration name",
+        suggestion:
+          "Write `@{kind} <Name>` (e.g. `@{kind} Money`). Names must start with a capital letter.",
+      },
+      DIRECTIVE_SYNTAX_DECLARATION_INVALID_NAME: {
+        message: "Invalid {kind} declaration name: \"{name}\"",
+        suggestion:
+          "Use Title-Case words separated by single spaces (e.g. `Weather Roll`, `Auto Action End Day`).",
+      },
       IMPORT_NOT_FOUND: {
         message: "@import target not found: {path}",
         suggestion:

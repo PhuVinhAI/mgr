@@ -155,3 +155,21 @@ clarity but not required.
 - Close GAP-011 (Visibility Transition) → PRD-006 v1.2 amendment.
 - Reference Game #3 (Business Mini) to stress PRD-013 Query &
   Selector with real Collections.
+
+---
+
+## Round 4 — Directive upgrade (Lemonade GAP-015)
+
+The Lemonade Round 4 rewrite promoted §15a declarations from prose
+to first-class directives (`@variable`, `@entity`, `@rule`,
+`@action`). Hangman followed the same upgrade so both reference
+games exercise the same Kernel surface.
+
+**Status:**
+- [x] Hangman rewritten with `@variable`, `@entity`, `@rule`, `@action`
+- [x] Builds cleanly against the upgraded Kernel (0 errors / 0 warnings)
+- [x] No new gaps opened by the upgrade itself
+
+The three pre-existing Hangman gaps (GAP-010, GAP-011, GAP-012)
+remain unchanged. The directive upgrade did not surface any new
+gap; the open items are still PRD amendments.

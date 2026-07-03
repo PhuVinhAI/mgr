@@ -22,9 +22,27 @@ async function makeProject(files: Record<string, string>): Promise<string> {
 }
 
 describe("directive registry (PRD-002 §14)", () => {
-  it("Foundation registry only ships @import and @section", () => {
+  it("Foundation registry ships leaf and §15a block directives", () => {
+    // Foundation ships @import + @section as leaf directives plus
+    // eight §15a block declarations (@variable, @entity, @formula,
+    // @rule, @event, @action, @auto-action, @query). Authors extend
+    // the registry with their own directives; Foundation owns the
+    // canonical surface.
     const r = createFoundationRegistry();
-    expect(r.names().sort()).toEqual(["import", "section"]);
+    expect(r.names().sort()).toEqual(
+      [
+        "action",
+        "auto-action",
+        "entity",
+        "event",
+        "formula",
+        "import",
+        "query",
+        "rule",
+        "section",
+        "variable",
+      ].sort(),
+    );
   });
 
   it("recognizes a directive registered from outside the parser", () => {
@@ -213,8 +231,21 @@ describe("parser rejects reserved directives (PRD-002 §11)", () => {
     }
   });
 
-  it("emits DIRECTIVE_RESERVED for names claimed by PRD-009/010", () => {
-    for (const name of ["formula", "rule", "visibility", "transient"]) {
+  it("emits DIRECTIVE_RESERVED for names still claimed by future PRDs", () => {
+    // Names that have handlers (@variable, @entity, @formula, @rule,
+    // @event, @action, @auto-action, @query) are no longer reserved
+    // — they ship in Foundation. Names still reserved belong to
+    // PRDs that have not landed yet: visibility, transient, guard,
+    // precondition, effect, trigger, priority, intent, parameters,
+    // query (note: @query IS now registered; listed here only if
+    // revisited). Kept as a representative sample of reserved names.
+    for (const name of [
+      "visibility",
+      "transient",
+      "guard",
+      "priority",
+      "intent",
+    ]) {
       try {
         parseSource({
           file: "/x/main.md",

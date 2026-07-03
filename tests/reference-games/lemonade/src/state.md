@@ -1,40 +1,40 @@
 @section state
 
 <!-- PRD-006 v1.1 State System + PRD-008 §6 State Schema + PRD-008 §15a.1
-     Section Schema. -->
+     Section Schema. Block declarations use first-class directives. -->
 
-## Variables
+## Public variables
 
-<!-- Each variable declares its Visibility per §15a.1. -->
+<!-- Every variable declares its Visibility per §15a.1. -->
 
-Variable Money
+@variable Money
 Visibility: Public
 
-Variable Day
+@variable Day
 Visibility: Public
 
-Variable Reputation
+@variable Reputation
 Visibility: Public
 
-Variable Price
+@variable Price
 Visibility: Public
 
-Variable Weather
+@variable Weather
 Visibility: Public
-
-Variable Customers
-Visibility: Private
 
 <!-- Customers is Private per PRD-006 §16 — revealed only in the
      end-of-day summary. -->
 
-Variable Lemons
+@variable Customers
+Visibility: Private
+
+@variable Lemons
 Visibility: Public
 
-Variable Sugar
+@variable Sugar
 Visibility: Public
 
-Variable Ice
+@variable Ice
 Visibility: Public
 
 ## Invariants

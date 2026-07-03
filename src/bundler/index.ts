@@ -24,6 +24,7 @@
 import type { ProjectGraph } from "../graph/index.js";
 import type {
   BlockNode,
+  BlockDeclarationNode,
   MgrDocument,
   SectionNode,
 } from "../parser/ast.js";
@@ -232,6 +233,48 @@ function renderInlineBlock(block: BlockNode): string {
       // a nested SectionNode, flatten it defensively so we still emit
       // a well-formed document.
       return renderSectionBody(block);
+    case "declaration":
+      // Block declaration directives (§15a). The header is emitted
+      // as `<Display Kind> <Name>` so the Section Schema validator's
+      // regex scanner (which expects prose-form headers) keeps
+      // matching; the body is emitted verbatim.
+      return renderDeclarationBlock(block);
+  }
+}
+
+/**
+ * Render a block declaration directive (§15a). The header is emitted
+ * with the kind's display name (`variable` → `Variable`,
+ * `auto-action` → `Auto Action`) so the Section Schema validator's
+ * prose-header scanner recognises it. The body is trimmed and emitted
+ * verbatim.
+ */
+function renderDeclarationBlock(block: BlockDeclarationNode): string {
+  const header = `${displayKind(block.kind)} ${block.name}`;
+  const body = block.body.trim();
+  if (body.length === 0) return header;
+  return `${header}\n${body}`;
+}
+
+/** Map a §15a kind to its Title-Case display name. */
+function displayKind(kind: BlockDeclarationNode["kind"]): string {
+  switch (kind) {
+    case "variable":
+      return "Variable";
+    case "entity":
+      return "Entity";
+    case "formula":
+      return "Formula";
+    case "rule":
+      return "Rule";
+    case "event":
+      return "Event";
+    case "action":
+      return "Action";
+    case "auto-action":
+      return "Auto Action";
+    case "query":
+      return "Query";
   }
 }
 

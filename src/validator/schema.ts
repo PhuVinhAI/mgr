@@ -7,6 +7,17 @@
  * Failure block on Rule Transformation/Guard and Action) plus
  * PRD-009 §18a (Formula body must be an expression, not prose).
  *
+ * Declaration inputs come from two shapes:
+ *
+ *   1. Prose declarations inside Markdown blocks. The scanner finds
+ *      a `<Kind> <Name>` header via regex (kept for backward
+ *      compatibility with the original markdown-only authoring
+ *      style).
+ *   2. BlockDeclarationNode produced by first-class directives
+ *      (@variable, @entity, @formula, @rule, @event, @action,
+ *      @auto-action, @query). Kind and name come from the AST; the
+ *      body is scanned for `Block:` field headings the same way.
+ *
  * Emission:
  *   - errors    → build fails. Missing execution block, forbidden
  *                 block, duplicate block, missing Kind, missing
@@ -22,7 +33,11 @@
 import * as path from "node:path";
 import { MgrError } from "../errors/index.js";
 import type { ProjectGraph } from "../graph/index.js";
-import type { BlockNode, MarkdownBlockNode } from "../parser/ast.js";
+import type {
+  BlockDeclarationNode,
+  BlockNode,
+  MarkdownBlockNode,
+} from "../parser/ast.js";
 
 /** The declaration kinds §15a enumerates. */
 type DeclKind =
@@ -67,6 +82,35 @@ interface Declaration {
  */
 const DECL_RE = /^(Variable|Entity|Formula|Rule|Event|Query|Auto Action|Action)\s+([A-Z][A-Za-z0-9]*(?:\s+[A-Z][A-Za-z0-9]*)*)\s*$/;
 const BLOCK_RE = /^([A-Z][A-Za-z ]*[A-Za-z]):\s*(.*)$/;
+
+/**
+ * Map a BlockDeclarationNode.kind to the DeclKind used by the schema
+ * tables below. Keeps the directive registry's kebab-case names
+ * (auto-action) distinct from the Title-Case display names
+ * (Auto Action) the prose scanner yields.
+ */
+function declKindFromDirective(
+  kind: BlockDeclarationNode["kind"],
+): DeclKind {
+  switch (kind) {
+    case "variable":
+      return "Variable";
+    case "entity":
+      return "Entity";
+    case "formula":
+      return "Formula";
+    case "rule":
+      return "Rule";
+    case "event":
+      return "Event";
+    case "action":
+      return "Action";
+    case "auto-action":
+      return "Auto Action";
+    case "query":
+      return "Query";
+  }
+}
 
 /**
  * The block-name catalog. Execution blocks come from §15a.1-.7.
@@ -172,14 +216,14 @@ export function validateSectionSchema(graph: ProjectGraph): {
     if (!doc) continue;
     const absFile = path.join(graph.srcDir, doc.relPath);
     for (const block of doc.blocks) {
-      collectDeclarations(block, absFile, errors, warnings);
+      collectFromBlock(block, absFile, errors, warnings);
     }
   }
 
   return { errors, warnings };
 }
 
-function collectDeclarations(
+function collectFromBlock(
   block: BlockNode,
   file: string,
   errors: MgrError[],
@@ -187,15 +231,29 @@ function collectDeclarations(
 ): void {
   if (block.type === "section") {
     for (const child of block.body) {
-      collectDeclarations(child, file, errors, warnings);
+      collectFromBlock(child, file, errors, warnings);
     }
     return;
   }
-  if (block.type !== "markdown") return;
-  scanMarkdown(block, file, errors, warnings);
+  if (block.type === "markdown") {
+    scanProseMarkdown(block, file, errors, warnings);
+    return;
+  }
+  if (block.type === "declaration") {
+    scanBlockDeclaration(block, file, errors, warnings);
+    return;
+  }
 }
 
-function scanMarkdown(
+/**
+ * Scan a MarkdownBlockNode for prose-form declarations.
+ *
+ * Kept for backward compatibility with sources that author the §15a
+ * shapes as plain markdown (`Variable Money` + `Visibility: Public`
+ * without a leading `@variable` directive). New sources should
+ * prefer the first-class directives handled by `scanBlockDeclaration`.
+ */
+function scanProseMarkdown(
   block: MarkdownBlockNode,
   file: string,
   errors: MgrError[],
@@ -314,6 +372,108 @@ function scanMarkdown(
   }
 
   finish();
+}
+
+/**
+ * Scan a BlockDeclarationNode produced by a first-class directive.
+ * Kind and name come from the AST; the body is scanned line-by-line
+ * for `Block:` field headings. Same emission rules as the prose
+ * scanner so downstream error codes stay uniform.
+ */
+function scanBlockDeclaration(
+  block: BlockDeclarationNode,
+  file: string,
+  errors: MgrError[],
+  warnings: MgrError[],
+): void {
+  const kind = declKindFromDirective(block.kind);
+  const body = block.body;
+  const bodyLines = body.length === 0 ? [] : body.split(/\r\n|\r|\n/);
+  const baseLine = block.location.line + 1;
+
+  const decl: Declaration = {
+    kind,
+    name: block.name,
+    blocks: new Map(),
+    bodyLines: [],
+    startLine: block.location.line,
+    file,
+  };
+
+  let inHtmlComment = false;
+
+  for (let i = 0; i < bodyLines.length; i++) {
+    const line = (bodyLines[i] ?? "").trim();
+    const absLine = baseLine + i;
+
+    // Multi-line HTML comments are treated as prose and skipped, the
+    // same way `scanProseMarkdown` handles them. This keeps authors
+    // free to annotate between field blocks without breaking schema
+    // checks.
+    if (inHtmlComment) {
+      if (line.includes("-->")) inHtmlComment = false;
+      continue;
+    }
+    if (line.startsWith("<!--")) {
+      if (!line.includes("-->")) inHtmlComment = true;
+      continue;
+    }
+
+    if (line.length === 0) continue;
+
+    const blockMatch = line.match(BLOCK_RE);
+    if (!blockMatch) {
+      // Non-block content line. For Formula declarations this feeds
+      // the §18a body validity check.
+      if (decl.kind === "Formula" && decl.blocks.size === 0) {
+        decl.bodyLines.push(line);
+      }
+      continue;
+    }
+
+    const blockName = blockMatch[1] ?? "";
+    if (blockName === "Kind") {
+      const inline = (blockMatch[2] ?? "").trim();
+      const value = inline.length > 0 ? inline : nextValue(bodyLines, i);
+      if (decl.kind === "Rule") {
+        if (
+          value === "Guard" ||
+          value === "Transformation" ||
+          value === "Trigger"
+        ) {
+          decl.ruleKind = value;
+        }
+      } else if (decl.kind === "Entity") {
+        decl.entityKind = value;
+      }
+    }
+
+    if (!KNOWN_BLOCKS.has(blockName)) {
+      if (decl.kind === "Formula" && decl.blocks.size === 0) {
+        decl.bodyLines.push(line);
+      }
+      continue;
+    }
+
+    if (decl.blocks.has(blockName)) {
+      errors.push(
+        new MgrError({
+          code: "SECTION_SCHEMA_DUPLICATE_BLOCK",
+          messageKey: "SECTION_SCHEMA_DUPLICATE_BLOCK",
+          params: {
+            kind: decl.kind,
+            name: decl.name,
+            block: blockName,
+          },
+          location: { file: decl.file, line: absLine },
+        }),
+      );
+    } else {
+      decl.blocks.set(blockName, absLine);
+    }
+  }
+
+  emitForDeclaration(decl, errors, warnings);
 }
 
 function nextValue(lines: string[], from: number): string {

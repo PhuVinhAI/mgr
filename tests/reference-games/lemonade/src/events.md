@@ -2,69 +2,54 @@
 
 <!-- PRD-008 §9 Events + PRD-008 §15a.5 Section Schema +
      PRD-005 v1.1 §7 Pre Event / §7a Post Event +
-     PRD-014 Documentation Schema. -->
+     PRD-014 Documentation Schema.
+     Block declarations use first-class directives. -->
 
 ## Pre Events
 
 <!-- Every event carries Phase, Trigger, Effect, Purpose (§15a.5 + §15a.11). -->
 
-Event Weather Roll
-
+@event Weather Roll
 Phase: Pre
-
 Trigger:
 Start of Day.
-
 Effect:
 Weather := Weighted(Sunny: 60, Rainy: 30, Heat Wave: 10)
-
 Purpose:
 Roll the day's weather before Simulation reads demand. Sunny is the
 default; Rainy suppresses demand; Heat Wave amplifies demand and
 raises the ice-per-cup recipe.
 
-Event Rain
-
+@event Rain
 Phase: Pre
-
 Trigger:
 Weather = Rainy
-
 Effect:
 TodayTemperature := Cool
-
 Purpose:
 Tag the day as Cool so ice demand drops. The visible Weather variable
 stays at Rainy for the dashboard.
 
-Event Heat Wave
-
+@event Heat Wave
 Phase: Pre
-
 Trigger:
 Weather = Heat Wave
-
 Effect:
 IcePerCup := 2
 
 <!-- PRD-005 §7: Heat Wave fires in Pre Event Phase so IcePerCup is
      set BEFORE Simulation reads the recipe. Resolves GAP-004. -->
-
 Purpose:
 Double the ice-per-cup recipe on Heat Wave days. Fires in Pre Event so
 Simulation's SellOneCup rule reads the updated recipe before the day
 begins.
 
-Event Supply Shortage
-
+@event Supply Shortage
 Phase: Pre
-
 Trigger:
 Day >= 5 AND Uniform(1, 100) <= 15
-
 Effect:
 SupplyShortageChance := 1
-
 Purpose:
 15% chance from Day 5 onward that the day's lemon supply is
 constrained. ApplyShortage Rule reads this flag and doubles LemonPrice
@@ -74,16 +59,12 @@ for the day.
 
 <!-- Consequences — resolve after Simulation, before Commit. -->
 
-Event Festival
-
+@event Festival
 Phase: Post
-
 Trigger:
 Customers = 0 AND Reputation >= 40
-
 Effect:
 Reputation += Clamp(5, 0, 100 - Reputation)
-
 Purpose:
 Reward selling out to a large crowd. Fires only when Reputation is
 already 40+ so early-game players don't feel arbitrarily punished.

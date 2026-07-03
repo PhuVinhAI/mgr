@@ -31,6 +31,14 @@ export interface ErrorCatalog {
     message: string;
     suggestion: string;
   };
+  DIRECTIVE_SYNTAX_DECLARATION_MISSING_NAME: {
+    message: string;
+    suggestion: string;
+  };
+  DIRECTIVE_SYNTAX_DECLARATION_INVALID_NAME: {
+    message: string;
+    suggestion: string;
+  };
   IMPORT_NOT_FOUND: { message: string; suggestion: string };
   IMPORT_NOT_A_FILE: { message: string; suggestion: string };
   IMPORT_OUTSIDE_SRC: { message: string; suggestion: string };

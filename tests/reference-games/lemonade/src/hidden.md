@@ -1,29 +1,30 @@
 @section hidden-state
 
 <!-- PRD-006 §11 Hidden State + §11a Visibility Declaration (v1.1)
-     + PRD-008 §15a.1 Section Schema. -->
+     + PRD-008 §15a.1 Section Schema.
+     Block declarations use first-class directives. -->
 
 ## Hidden variables
 
-Variable TodayDemand
+@variable TodayDemand
 Visibility: Hidden
 
-Variable TodayTemperature
+@variable TodayTemperature
 Visibility: Hidden
 
-Variable FestivalChance
+@variable FestivalChance
 Visibility: Hidden
 
-Variable SupplyShortageChance
+@variable SupplyShortageChance
 Visibility: Hidden
 
-Variable IcePerCup
+@variable IcePerCup
 Visibility: Hidden
 
 <!-- IcePerCup defaults to 1 and is set to 2 by the Heat Wave Pre Event
      Rule (see rules.md). -->
 
-Variable LemonPrice
+@variable LemonPrice
 Visibility: Hidden
 
 <!-- LemonPrice defaults to 5 cents/unit and doubles when Supply Shortage

@@ -126,6 +126,16 @@ export const vi: Messages = {
         message: "Directive @import yêu cầu đường dẫn",
         suggestion: "Viết `@import <đường-dẫn>` (ví dụ `@import intro.md`).",
       },
+      DIRECTIVE_SYNTAX_DECLARATION_MISSING_NAME: {
+        message: "Directive @{kind} yêu cầu tên declaration",
+        suggestion:
+          "Viết `@{kind} <Tên>` (ví dụ `@{kind} Money`). Tên phải bắt đầu bằng chữ hoa.",
+      },
+      DIRECTIVE_SYNTAX_DECLARATION_INVALID_NAME: {
+        message: "Tên declaration {kind} không hợp lệ: \"{name}\"",
+        suggestion:
+          "Dùng các từ Title-Case cách nhau bởi một dấu cách (ví dụ `Weather Roll`, `Auto Action End Day`).",
+      },
       IMPORT_NOT_FOUND: {
         message: "Không tìm thấy đích của @import: {path}",
         suggestion:

@@ -503,3 +503,105 @@ Reference Game #2 — Hangman — now exists at
 Follow-up candidates: PRD-009 v1.2 §8a String Operators (closes
 GAP-010), PRD-006 v1.2 §11b Visibility Transition (closes GAP-011),
 Reference Game #3 (Business Mini) for PRD-013 Query.
+
+---
+
+## Round 4 gaps
+
+After Round 3 the Kernel shipped a machine-parsable authoring surface.
+The only directives the parser actually recognised were still
+`@import` and `@section`; every §15a declaration was prose text the
+Section Schema validator scanned with regex. That worked, but it made
+the parser a dispatcher for two directives and a validator that did
+most of the real structural work. Round 4 promotes the §15a shapes
+to first-class directives so the parser is the source of truth.
+
+### GAP-015 — §15a declarations were prose, not directives  ✅ CLOSED
+
+**File:** `src/state.md`, `src/entities.md`, `src/rules.md`,
+`src/events.md`, `src/actions.md`, `src/hidden.md`
+**PRDs consulted:** PRD-008 §15a (Section Schema), PRD-002 §14
+(Directive Registry)
+**Category:** package
+
+**What I needed to decide:**
+`Variable Money`, `Entity Player`, `Rule CanBuyLemons`,
+`Action Buy Lemons` were written as markdown lines and matched by a
+regex in the Section Schema validator. The parser only knew
+`@import` and `@section`. Adding a new declaration kind required
+updating the validator regex, the i18n catalog, and the Reserved
+list — but the parser never saw the declaration at all.
+
+**What the PRDs said:**
+PRD-002 §14 says the parser is directive-agnostic and new directives
+register via the registry; PRD-008 §15a lists the eight canonical
+declaration kinds but does not bind them to directive names.
+
+**Resolution:**
+- **AST** — new `BlockDeclarationNode` (`type: "declaration"`,
+  `kind`, `name`, `body`, `bodyLines`) joins the existing leaf
+  directives and MarkdownBlockNode.
+- **Parser** — tracks an open block declaration; consumes subsequent
+  non-directive, non-heading lines as the body. Body terminates at
+  the next `@`-directive, a heading, or end-of-section. Blank lines
+  are kept inside the body so authors can separate field paragraphs.
+- **Directive registry** — Foundation now ships ten directives:
+  `@import`, `@section`, `@variable`, `@entity`, `@formula`, `@rule`,
+  `@event`, `@action`, `@auto-action`, `@query`. Each block handler
+  validates a Title-Case multi-word name (`Auto Action End Day`).
+- **Bundler** — `renderDeclarationBlock` emits
+  `<Display Kind> <Name>\n<body>` so the Section Schema validator's
+  prose-header scanner keeps matching; PSF §16 Prompt Purity still
+  strips the `@` from the rendered output.
+- **Validator** — `scanBlockDeclaration` runs alongside the legacy
+  `scanProseMarkdown` so existing markdown-only sources still build.
+  HTML comment tracking is shared between the two scanners.
+- **I18n** — two new error codes (`DIRECTIVE_SYNTAX_DECLARATION_MISSING_NAME`,
+  `DIRECTIVE_SYNTAX_DECLARATION_INVALID_NAME`) plus en + vi entries.
+- **Tests** — 18 new tests in `test/block-declarations.test.ts`,
+  2 existing tests in `test/registry.test.ts` updated to reflect the
+  new registry contents. Total: 111 tests passing.
+
+**Round 4 code impact:**
+- `src/parser/ast.ts` — added `BlockDeclarationKind`, `BlockDeclarationNode`,
+  flat `declarations` list on `MgrDocument`.
+- `src/parser/index.ts` — block-mode state machine; `closeDeclaration`
+  trims trailing blank lines and records per-line locations for
+  validator error reporting.
+- `src/parser/directives.ts` — 8 new handlers via `makeBlockHandler`;
+  updated `DirectiveHandler` return type to include
+  `BlockDeclarationNode`; added
+  `DIRECTIVE_SYNTAX_DECLARATION_MISSING_NAME` and
+  `DIRECTIVE_SYNTAX_DECLARATION_INVALID_NAME` keys.
+- `src/bundler/index.ts` — `renderDeclarationBlock` + `displayKind`
+  helpers; the PSF envelope now mixes `Section -> BlockDeclarationNode`
+  children with prose.
+- `src/validator/schema.ts` — `scanBlockDeclaration` mirrors the
+  prose scanner with HTML comment tracking; shared `Declaration`
+  struct + `emitForDeclaration` reducer.
+- `src/i18n/{en,vi}.ts` + `src/i18n/types.ts` — two new catalog
+  entries.
+- `src/errors/index.ts` — two new `MgrErrorCode` members.
+
+**Game impact:**
+- Lemonade rewritten to use `@variable`, `@entity`, `@formula`,
+  `@rule`, `@event`, `@action`, `@auto-action`. Hidden state is a
+  separate `@section hidden-state` file with its own `@variable`s.
+- Hangman rewritten to use `@variable`, `@entity`, `@rule`,
+  `@action`. No events needed (Trigger rules cover end conditions);
+  no auto-action needed.
+- Both compile cleanly with the upgraded kernel; lemonade emits 18
+  `DOCUMENTATION_PURPOSE_MISSING` warnings on Variables + Entities
+  that lack a `Purpose:` block (WARNING level per PRD-014 §4), and
+  hangman builds clean (0 errors / 0 warnings).
+
+**Next step:**
+- PRD-009 v1.2 §8a String Operators (still needed to close
+  hangman GAP-010).
+- PRD-006 v1.2 §11b Visibility Transition (still needed to close
+  hangman GAP-011).
+- Reference Game #3 (Business Mini) to stress PRD-013 Query with
+  Collections end-to-end.
+- Future PRD amendment: bind §15a directive kinds to
+  reserved-name slots so `guard`, `trigger`, etc. (still reserved)
+  migrate cleanly when their PRDs land.

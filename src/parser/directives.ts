@@ -1,19 +1,27 @@
 /**
  * Directive Registry — per PRD-002 §14.
  *
- * The parser is directive-agnostic: it only recognizes the `@name arg`
- * shape on a line and hands off to a handler looked up in the registry.
- * New directives can be added by registering a handler; no parser code
- * needs to change (PRD-002 §14 Extensibility).
+ * The parser is directive-agnostic: it only recognises the `@name arg`
+ * shape on a line and hands off to a handler looked up in the
+ * registry. New directives can be added by registering a handler; no
+ * parser code needs to change (PRD-002 §14 Extensibility).
  *
- * Two directives ship with Foundation: `@import` and `@section`
- * (PRD-002 §5). Every name listed in PRD-002 §11 is marked reserved:
- * the parser rejects it with a stable error rather than silently
- * treating it as unknown, so developer files never squat on a name a
- * future PRD may define.
+ * Foundation ships two leaf directives (`@import`, `@section`) and
+ * eight block directives (`@variable`, `@entity`, `@formula`,
+ * `@rule`, `@event`, `@action`, `@auto-action`, `@query`) per
+ * PRD-008 §15a. Block directive handlers return a stub node with an
+ * empty body; the parser collects the body lines itself.
+ *
+ * Every name listed in PRD-002 §11 (plus the names claimed by
+ * PRD-005/006/008/009/010/011/012/013/014) is marked reserved: the
+ * parser rejects it with a stable error rather than silently treating
+ * it as unknown, so developer files never squat on a name a future
+ * PRD may define.
  */
 import { MgrError, type MgrErrorLocation } from "../errors/index.js";
 import type {
+  BlockDeclarationKind,
+  BlockDeclarationNode,
   DirectiveNode,
   SectionNode,
   SourceLocation,
@@ -23,6 +31,7 @@ export type DirectiveCategory =
   | "project"
   | "metadata"
   | "structure"
+  | "declaration"
   | "build";
 
 export interface DirectiveContext {
@@ -37,14 +46,22 @@ export interface DirectiveContext {
 }
 
 /**
- * A handler returns either a DirectiveNode (a leaf) or a SectionNode
- * (a container that becomes the current section on the parser stack).
+ * A handler returns one of three node kinds:
+ *
+ * - DirectiveNode — a leaf line that the parser emits verbatim.
+ *   `@import` is the canonical example.
+ * - SectionNode — a container that opens a named section on the
+ *   parser stack. `@section` is the canonical example.
+ * - BlockDeclarationNode — a stub that the parser fills with body
+ *   lines until a blank line, another directive, a heading, or
+ *   end-of-section. The §15a declarations use this shape.
+ *
  * Handlers must throw MgrError for any syntax problem so the parser
  * stays a pure dispatcher.
  */
 export type DirectiveHandler = (
   ctx: DirectiveContext,
-) => DirectiveNode | SectionNode;
+) => DirectiveNode | SectionNode | BlockDeclarationNode;
 
 export interface DirectiveDefinition {
   /** Lowercased directive name (without the leading `@`). */
@@ -200,10 +217,21 @@ export class DirectiveRegistry {
 }
 
 // -----------------------------------------------------------------
-// Foundation handlers (PRD-002 §5): @import and @section.
+// Foundation handlers (PRD-002 §5, PRD-008 §15a).
 // -----------------------------------------------------------------
 
-const FOUNDATION_NAMES: ReadonlySet<string> = new Set(["import", "section"]);
+const FOUNDATION_NAMES: ReadonlySet<string> = new Set([
+  "import",
+  "section",
+  "variable",
+  "entity",
+  "formula",
+  "rule",
+  "event",
+  "action",
+  "auto-action",
+  "query",
+]);
 
 const importHandler: DirectiveHandler = (ctx) => {
   const target = ctx.arg.trim();
@@ -253,6 +281,50 @@ const sectionHandler: DirectiveHandler = (ctx) => {
 };
 
 /**
+ * Build a stub BlockDeclarationNode for a §15a block directive.
+ * Centralises the validation rules shared by all eight block
+ * handlers: a non-empty name composed of valid identifier characters.
+ */
+function buildDeclarationStub(
+  kind: BlockDeclarationKind,
+  ctx: DirectiveContext,
+): BlockDeclarationNode {
+  const name = ctx.arg.trim();
+  if (name.length === 0) {
+    throw new MgrError({
+      code: "DIRECTIVE_SYNTAX",
+      messageKey: "DIRECTIVE_SYNTAX_DECLARATION_MISSING_NAME",
+      params: { kind },
+      location: locFor(ctx.file, ctx.location.line),
+      directive: `@${kind}`,
+    });
+  }
+  if (!isValidDeclarationName(name)) {
+    throw new MgrError({
+      code: "DIRECTIVE_SYNTAX",
+      messageKey: "DIRECTIVE_SYNTAX_DECLARATION_INVALID_NAME",
+      params: { kind, name },
+      location: locFor(ctx.file, ctx.location.line),
+      directive: `@${kind}`,
+    });
+  }
+  return {
+    type: "declaration",
+    kind,
+    name,
+    body: "",
+    bodyLines: [],
+    location: ctx.location,
+  };
+}
+
+function makeBlockHandler(
+  kind: BlockDeclarationKind,
+): DirectiveHandler {
+  return (ctx) => buildDeclarationStub(kind, ctx);
+}
+
+/**
  * Build the registry Foundation ships with. Callers may register more
  * directives (or replace these) before parsing.
  */
@@ -268,6 +340,47 @@ export function createFoundationRegistry(): DirectiveRegistry {
     category: "structure",
     handler: sectionHandler,
   });
+  // PRD-008 §15a block declarations.
+  r.register({
+    name: "variable",
+    category: "declaration",
+    handler: makeBlockHandler("variable"),
+  });
+  r.register({
+    name: "entity",
+    category: "declaration",
+    handler: makeBlockHandler("entity"),
+  });
+  r.register({
+    name: "formula",
+    category: "declaration",
+    handler: makeBlockHandler("formula"),
+  });
+  r.register({
+    name: "rule",
+    category: "declaration",
+    handler: makeBlockHandler("rule"),
+  });
+  r.register({
+    name: "event",
+    category: "declaration",
+    handler: makeBlockHandler("event"),
+  });
+  r.register({
+    name: "action",
+    category: "declaration",
+    handler: makeBlockHandler("action"),
+  });
+  r.register({
+    name: "auto-action",
+    category: "declaration",
+    handler: makeBlockHandler("auto-action"),
+  });
+  r.register({
+    name: "query",
+    category: "declaration",
+    handler: makeBlockHandler("query"),
+  });
   return r;
 }
 
@@ -277,6 +390,21 @@ function locFor(file: string, line: number): MgrErrorLocation {
 
 function isValidSectionId(id: string): boolean {
   return /^[A-Za-z0-9._-]+$/.test(id);
+}
+
+/**
+ * Declaration names permit Title-Case identifiers and the space-
+ * separated form used by §15a (`Auto Action End Day`). Each word
+ * must start with an upper-case letter and contain only letters,
+ * digits, and underscores. This deliberately excludes sentence-like
+ * text so an `Action` block whose `Intent:` value happens to start
+ * with a lowercase word cannot be misparsed as a declaration.
+ */
+function isValidDeclarationName(name: string): boolean {
+  const words = name.split(/\s+/);
+  return words.every(
+    (w) => w.length > 0 && /^[A-Z][A-Za-z0-9_]*$/.test(w),
+  );
 }
 
 function editDistance(a: string, b: string): number {
