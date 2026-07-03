@@ -45,6 +45,9 @@ export const vi: Messages = {
     validateFail: "{count} lỗi",
     bundleMerged: "Đã ghép {count} file",
     writeTo: "{path}",
+    tokens: "Đang đếm token ({chars} ký tự)",
+    tokensSummary:
+      "OpenAI: {openai} \u00b7 Anthropic: {anthropic} \u00b7 Gemini: {gemini}",
   },
   init: {
     creating: "Đang tạo file project trong {dir}",

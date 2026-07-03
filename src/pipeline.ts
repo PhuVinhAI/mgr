@@ -20,6 +20,7 @@ import { optimize } from "./optimizer/index.js";
 import { t } from "./i18n/index.js";
 import { COMPILER_VERSION } from "./version.js";
 import { RUNTIME_SPEC_VERSION } from "./runtime/index.js";
+import { countTokens, type TokenCount } from "./tokenizer/index.js";
 
 export interface CompileOptions {
   /** Project root directory (must contain mgr.config.json). */
@@ -34,6 +35,13 @@ export interface CompileOptions {
    * (§17) should pin this to keep output byte-identical.
    */
   buildDate?: Date;
+  /**
+   * If false, skip token counting entirely. Default: true. Token
+   * counting is local for OpenAI + Anthropic; for Gemini it uses
+   * the API when `GEMINI_API_KEY` is set and falls back to the
+   * ~4 chars/token estimator otherwise.
+   */
+  tokens?: boolean;
 }
 
 export interface CompileResult {
@@ -44,6 +52,13 @@ export interface CompileResult {
   output: string;
   outputPath: string;
   durationMs: number;
+  /**
+   * Token counts for the compiled Markdown across OpenAI, Anthropic,
+   * and Gemini providers. Undefined when `options.tokens === false`.
+   * Computed after the Optimizer step on the final content so the
+   * numbers reflect what the LLM will actually see.
+   */
+  tokens?: TokenCount;
 }
 
 const CONFIG_FILE = "mgr.config.json";
@@ -158,6 +173,34 @@ export async function compile(
   const optimized = optimize(bundled.content);
   logger.stepSuccess("optimize");
 
+  // 5b. Token counting. Skipped when `options.tokens === false` so
+  //     callers in CI pipelines can opt out. The OpenAI and
+  //     Anthropic tokenizers run synchronously; the Gemini call is
+  //     awaited and falls back to an estimator when no API key is
+  //     configured.
+  let tokens: TokenCount | undefined;
+  if (options.tokens !== false) {
+    logger.stepStart(
+      "tokens",
+      t((m) => m.stepDetail.tokens, {
+        chars: String(optimized.content.length),
+      }),
+    );
+    try {
+      tokens = await countTokens(optimized.content);
+      logger.stepSuccess(
+        "tokens",
+        t((m) => m.stepDetail.tokensSummary, {
+          openai: String(tokens.openai.tokens),
+          anthropic: String(tokens.anthropic.tokens),
+          gemini: String(tokens.gemini.tokens),
+        }),
+      );
+    } catch (err) {
+      logger.stepFail("tokens", (err as Error).message ?? String(err));
+    }
+  }
+
   // 6. Write.
   const outputPath = path.join(root, config.outDir, resolveOutFilename(config));
   if (options.write !== false) {
@@ -185,6 +228,7 @@ export async function compile(
     output: optimized.content,
     outputPath,
     durationMs: performance.now() - started,
+    ...(tokens ? { tokens } : {}),
   };
 }
 

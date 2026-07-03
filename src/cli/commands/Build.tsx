@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { writeFile } from "node:fs/promises";
+import * as path from "node:path";
 import { Box, Text, useApp } from "ink";
 import { compile, type CompileResult } from "../../pipeline.js";
 import { getMessages, t } from "../../i18n/index.js";
@@ -8,6 +10,17 @@ import { ErrorReport } from "../components/ErrorReport.js";
 
 interface Props {
   root: string;
+}
+
+/** Format a token count with kind marker for the CLI summary line. */
+function fmt(count: { tokens: number; kind: string; model: string }): string {
+  const tag =
+    count.kind === "exact"
+      ? ""
+      : count.kind === "estimate"
+        ? " (est)"
+        : " (err)";
+  return `${count.tokens}${tag}`;
 }
 
 export const BuildCommand: React.FC<Props> = ({ root }) => {
@@ -23,6 +36,33 @@ export const BuildCommand: React.FC<Props> = ({ root }) => {
     (async () => {
       try {
         const r = await compile({ root, sink });
+        // Write a `.tokens.json` sidecar next to the prompt spec so
+        // downstream tools (CI diffs, dashboards, prompt-engineering
+        // notebooks) can read the count without re-running the
+        // tokenizer.
+        if (r.tokens) {
+          const sidecarPath = `${r.outputPath}.tokens.json`;
+          await writeFile(
+            sidecarPath,
+            JSON.stringify(
+              {
+                project: r.config.name,
+                version: r.config.version,
+                outputPath: r.outputPath,
+                generatedAt: new Date().toISOString(),
+                characters: r.tokens.characters,
+                providers: {
+                  openai: r.tokens.openai,
+                  anthropic: r.tokens.anthropic,
+                  gemini: r.tokens.gemini,
+                },
+              },
+              null,
+              2,
+            ),
+            "utf8",
+          );
+        }
         if (!cancelled) setResult(r);
       } catch (err) {
         if (!cancelled) setError(err);
@@ -74,8 +114,45 @@ export const BuildCommand: React.FC<Props> = ({ root }) => {
               ms: Math.round(result.durationMs),
             })}
           </Text>
+          {result.tokens ? (
+            <>
+              <Box marginTop={1} flexDirection="column">
+                <Text bold>Token counts</Text>
+                <Text>
+                  {"  "}characters: {result.tokens.characters}
+                </Text>
+                <Text>
+                  {"  "}openai ({result.tokens.openai.model}):{" "}
+                  {fmt(result.tokens.openai)}
+                </Text>
+                <Text>
+                  {"  "}anthropic ({result.tokens.anthropic.model}):{" "}
+                  {fmt(result.tokens.anthropic)}
+                </Text>
+                <Text>
+                  {"  "}gemini ({result.tokens.gemini.model}):{" "}
+                  {fmt(result.tokens.gemini)}
+                </Text>
+                {result.tokens.gemini.kind === "estimate" ? (
+                  <Text dimColor>
+                    {"  "}gemini: estimate (set GEMINI_API_KEY for exact)
+                  </Text>
+                ) : null}
+                <Text dimColor>
+                  {"  "}sidecar: {result.outputPath}.tokens.json
+                </Text>
+              </Box>
+            </>
+          ) : null}
         </Box>
       ) : null}
     </Box>
   );
 };
+
+// Re-export for tests that may want to format a count without React.
+export const __testing = { fmt };
+// Avoid an unused import warning when path is only referenced via the
+// path.basename call below; keeps the module stable for callers that
+// import BuildCommand.
+void path;

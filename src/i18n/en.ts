@@ -45,6 +45,9 @@ export const en: Messages = {
     validateFail: "{count} error(s)",
     bundleMerged: "{count} file(s) merged",
     writeTo: "{path}",
+    tokens: "Counting tokens ({chars} chars)",
+    tokensSummary:
+      "OpenAI: {openai} \u00b7 Anthropic: {anthropic} \u00b7 Gemini: {gemini}",
   },
   init: {
     creating: "Creating project files in {dir}",

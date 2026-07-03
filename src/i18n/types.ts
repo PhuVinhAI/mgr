@@ -87,6 +87,8 @@ export interface Messages {
     validateFail: string;
     bundleMerged: string;
     writeTo: string;
+    tokens: string;
+    tokensSummary: string;
   };
   init: {
     creating: string;

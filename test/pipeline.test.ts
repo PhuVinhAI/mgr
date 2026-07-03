@@ -30,7 +30,11 @@ describe("pipeline", () => {
       "src/intro.md": "@section intro\n\nHello from intro.\n",
     });
 
-    const result = await compile({ root, buildDate: new Date(0) });
+    const result = await compile({
+      root,
+      buildDate: new Date(0),
+      tokens: false,
+    });
     expect(result.validation.ok).toBe(true);
     expect(result.graph.documents.size).toBe(2);
     const written = await readFile(result.outputPath, "utf8");
@@ -57,8 +61,8 @@ describe("pipeline", () => {
     const r1 = await makeProject(files);
     const r2 = await makeProject(files);
     const buildDate = new Date(0);
-    const b1 = await compile({ root: r1, buildDate });
-    const b2 = await compile({ root: r2, buildDate });
+    const b1 = await compile({ root: r1, buildDate, tokens: false });
+    const b2 = await compile({ root: r2, buildDate, tokens: false });
     expect(b1.output).toBe(b2.output);
     await rm(r1, { recursive: true, force: true });
     await rm(r2, { recursive: true, force: true });
@@ -69,7 +73,7 @@ describe("pipeline", () => {
       "mgr.config.json": JSON.stringify({ name: "e", entry: "main.md" }),
       "src/main.md": "@import missing.md\n",
     });
-    await expect(compile({ root })).rejects.toMatchObject({
+    await expect(compile({ root, tokens: false })).rejects.toMatchObject({
       code: "IMPORT_NOT_FOUND",
       messageKey: "IMPORT_NOT_FOUND",
       directive: "@import",
@@ -83,7 +87,7 @@ describe("pipeline", () => {
       "src/a.md": "@section shared\n\nA\n",
       "src/b.md": "@section shared\n\nB\n",
     });
-    await expect(compile({ root })).rejects.toMatchObject({
+    await expect(compile({ root, tokens: false })).rejects.toMatchObject({
       name: "MgrErrorList",
     });
   });
@@ -95,7 +99,7 @@ describe("pipeline", () => {
       "src/a.md": "@import b.md\n",
       "src/b.md": "@import a.md\n",
     });
-    await expect(compile({ root })).rejects.toMatchObject({
+    await expect(compile({ root, tokens: false })).rejects.toMatchObject({
       code: "DEPENDENCY_CYCLE",
     });
   });
@@ -109,7 +113,11 @@ describe("pipeline", () => {
       }),
       "src/main.md": "@section system\n\nS\n",
     });
-    const result = await compile({ root, buildDate: new Date(0) });
+    const result = await compile({
+      root,
+      buildDate: new Date(0),
+      tokens: false,
+    });
     expect(path.basename(result.outputPath)).toBe("hangman-0.1.0.md");
     // The file physically exists at the derived path.
     const written = await readFile(result.outputPath, "utf8");
@@ -126,7 +134,11 @@ describe("pipeline", () => {
       }),
       "src/main.md": "@section system\n\nS\n",
     });
-    const result = await compile({ root, buildDate: new Date(0) });
+    const result = await compile({
+      root,
+      buildDate: new Date(0),
+      tokens: false,
+    });
     expect(path.basename(result.outputPath)).toBe("spec.md");
   });
 
@@ -140,7 +152,11 @@ describe("pipeline", () => {
       }),
       "src/main.md": "@section system\n\nS\n",
     });
-    const result = await compile({ root, buildDate: new Date(0) });
+    const result = await compile({
+      root,
+      buildDate: new Date(0),
+      tokens: false,
+    });
     const base = path.basename(result.outputPath);
     expect(base).not.toContain("/");
     expect(base).not.toContain("\\");
